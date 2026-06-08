@@ -1,0 +1,45 @@
+# ── Java / Maven ─────────────────────────────────────────────────
+target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/
+!.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.properties
+
+# ── Spring Boot ────────────────────────────────────────────────────
+backend/src/main/resources/application-prod.properties
+
+# ── Node / React ───────────────────────────────────────────────────
+node_modules/
+dist/
+.vite/
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# ── IDE ────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.settings/
+.project
+.classpath
+
+# ── OS ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ────────────────────────────────────────────────────────────
+*.log
+logs/
+spring.log
+
+# Project docs that should not be committed during development
+API_DOCS.md
+DATABASE_SCHEMA.md
+MILESTONES.md
+
