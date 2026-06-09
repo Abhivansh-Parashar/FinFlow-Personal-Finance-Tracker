@@ -14,17 +14,22 @@
 
 ## ✨ Features
 
-| Feature | Status |
-|---|---|
-| User Registration & Login (JWT) | 🔲 Implement |
-| Dashboard with analytics | ✅ Frontend Ready |
-| Income & Expense Tracking | 🔲 Implement |
-| Category Management | 🔲 Implement |
-| Budget Management | 🔲 Implement |
-| Monthly Reports & Charts | ✅ Frontend Ready |
-| Profile Management | 🔲 Implement |
-| Paginated Transaction History | 🔲 Implement |
-
+- User Registration & Login (JWT)
+- Dashboard with Analytics
+- Income & Expense Tracking
+- Category Management
+- Budget Management
+- Monthly Reports & Charts
+- Profile Management
+- Paginated Transaction History
+- Transaction Filtering & Search
+- Category-wise Expense Analysis
+- Monthly Budget Tracking
+- Financial Insights & Summaries
+- Secure Authentication & Authorization
+- Responsive Modern UI
+- RESTful API Integration
+- Data Validation & Error Handling
 ---
 
 ## 🏗️ Project Structure
