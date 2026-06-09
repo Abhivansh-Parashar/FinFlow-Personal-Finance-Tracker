@@ -1,6 +1,7 @@
 package com.financetracker.repository;
 
 import com.financetracker.entity.Budget;
+import org.springframework.boot.autoconfigure.liquibase.LiquibaseProperties;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
@@ -17,7 +18,8 @@ import java.util.Optional;
  */
 @Repository
 public interface BudgetRepository extends JpaRepository<Budget, Long> {
-
-    // TODO: Add query methods here
-
+    List<Budget> findAllByUserId(Long userId);
+    List<Budget> findAllByUserIdAndMonth(Long userId, String month);
+    Optional<Budget> findByUserIdAndCategoryIdAndMonth(Long userId, Long categoryId, String month);
+    boolean existsByUserIdAndCategoryIdAndMonth(Long userId, Long categoryId, String month);
 }
