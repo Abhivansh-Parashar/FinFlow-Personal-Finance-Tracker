@@ -4,7 +4,9 @@ import com.financetracker.entity.Category;
 import com.financetracker.enums.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Repository for {@link Category}.
@@ -18,6 +20,9 @@ import java.util.List;
 @Repository
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
-    // TODO: Add query methods here
+    List<Category> findAllByUserId(Long userId);
+    List<Category> findAllByUserIdAndType(Long userId, TransactionType type);
+    List<Category> findAllByIsDefaultTrue();
+    boolean existsByNameAndUserId(String name, Long userId);
 
 }
