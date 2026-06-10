@@ -1,5 +1,7 @@
 package com.financetracker.dto.response;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.*;
 
 /**
@@ -7,5 +9,11 @@ import lombok.*;
  */
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class AuthResponse {
-    // TODO: Add fields
+    private String token;
+    private  String tokenType = "Bearer";
+    private Long userId;
+    private String name;
+    private String email;
+
+
 }

@@ -9,5 +9,11 @@ import java.math.BigDecimal;
  */
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class CategoryBreakdownResponse {
-    // TODO: Add fields
+
+    private Long categoryId;
+    private String categoryName;
+    private String categoryIcon;
+    private BigDecimal totalAmount;
+    private BigDecimal percentage;
+    private String color;
 }

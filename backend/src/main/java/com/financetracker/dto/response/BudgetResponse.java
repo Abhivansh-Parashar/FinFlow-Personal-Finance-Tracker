@@ -9,5 +9,12 @@ import java.math.BigDecimal;
  */
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class BudgetResponse {
-    // TODO: Add fields
+    private Long id, categoryId;
+    private String categoryName;
+    private String categoryIcon;
+    private BigDecimal budgetAmount;
+    private BigDecimal spentAmount;
+    private BigDecimal remainingAmount;
+    private BigDecimal percentageUsed;
+    private String month;
 }

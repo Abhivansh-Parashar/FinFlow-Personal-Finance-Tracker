@@ -9,5 +9,9 @@ import lombok.*;
  */
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class CategoryRequest {
-    // TODO: Add fields
+    @NotBlank
+    private String name;
+    private String icon;
+    private String color;
+    private TransactionType type;
 }

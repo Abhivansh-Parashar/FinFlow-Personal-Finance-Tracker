@@ -8,5 +8,11 @@ import lombok.*;
  */
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class CategoryResponse {
-    // TODO: Add fields
+    private Long id;
+    private String name;
+    private String icon;
+    private String color;
+    private TransactionType type;
+    private boolean isDefault;
+    private Long transactionCount;
 }
