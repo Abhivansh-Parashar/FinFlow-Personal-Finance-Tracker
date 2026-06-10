@@ -3,7 +3,6 @@ package com.financetracker.dto.response;
 import com.financetracker.enums.TransactionType;
 import lombok.*;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 /**
@@ -12,5 +11,14 @@ import java.time.LocalDateTime;
  */
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class TransactionResponse {
-    // TODO: Add fields
+    private Long id;
+    private String description;
+    private BigDecimal amount;
+    private TransactionType transactionType;
+    private LocalDateTime date;
+    private String note;
+    private Long categoryId;
+    private String categoryName;
+    private String categoryIcon;
+    private LocalDateTime createdAt;
 }

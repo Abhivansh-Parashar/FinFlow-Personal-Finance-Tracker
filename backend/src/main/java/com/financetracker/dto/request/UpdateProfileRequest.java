@@ -9,5 +9,10 @@ import java.math.BigDecimal;
  */
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class UpdateProfileRequest {
-    // TODO: Add fields
+    @NotBlank
+    private String name;
+    @NotBlank @Size(min = 3, max = 3)
+    private String currency;
+    @NotNull @Positive
+    private BigDecimal monthlyBudget;
 }

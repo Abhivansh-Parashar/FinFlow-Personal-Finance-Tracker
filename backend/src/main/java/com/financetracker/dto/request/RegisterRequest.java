@@ -9,5 +9,10 @@ import lombok.*;
  */
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class RegisterRequest {
-    // TODO: Add fields
+    @NotBlank
+    private String name;
+    @NotBlank @Email
+    private String email;
+    @NotBlank @Size(min = 8, max = 100)
+    private String password;
 }

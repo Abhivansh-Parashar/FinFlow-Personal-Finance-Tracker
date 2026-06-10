@@ -8,5 +8,9 @@ import lombok.*;
  */
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class LoginRequest {
-    // TODO: Add fields
+    @NotBlank
+    @Email
+    private String email;
+    @NotBlank
+    private  String password;
 }

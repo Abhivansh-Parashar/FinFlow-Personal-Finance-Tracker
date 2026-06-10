@@ -1,6 +1,9 @@
 package com.financetracker.dto.response;
 
+import com.financetracker.enums.Role;
 import lombok.*;
+
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
@@ -8,5 +11,11 @@ import java.time.LocalDateTime;
  */
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class UserResponse {
-    // TODO: Add fields
+    private Long id;
+    private String name;
+    private String email;
+    private String currency;
+    private BigDecimal monthlyBudget;
+    private Role role;
+    private LocalDateTime createdAt;
 }
