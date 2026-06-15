@@ -26,7 +26,16 @@ public class CorsConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        // TODO: Implement CORS config
-        return null;
+        CorsConfiguration config = new CorsConfiguration();
+
+        config.setAllowedMethods(List.of("GET", "PUT", "POST", "DELETE", "OPTIONS"));
+        config.setAllowedOrigins(List.of(allowedOrigins));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+
+        return source;
     }
 }
