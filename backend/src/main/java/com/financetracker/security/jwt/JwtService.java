@@ -1,7 +1,14 @@
 package com.financetracker.security.jwt;
 
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
+
 
 /**
  * Service for JWT token generation, validation, and extraction.
@@ -28,22 +35,56 @@ import org.springframework.stereotype.Service;
 @Service
 public class JwtService {
 
-    // TODO: @Value("${app.jwt.secret}") private String secretKey;
-    // TODO: @Value("${app.jwt.expiration-ms}") private long jwtExpirationMs;
+    @Value("${app.jwt.secret}")
+    private String secretKey;
+    @Value("${app.jwt.expiration-ms}")
+    private long jwtExpirationMs;
+
+    private SecretKey getSigningKey() {
+        return Keys.hmacShaKeyFor(
+                secretKey.getBytes(StandardCharsets.UTF_8)
+        );
+    }
 
     public String generateToken(UserDetails userDetails) {
-        throw new UnsupportedOperationException("Not yet implemented");
+        String token = Jwts
+            .builder()
+                .subject(userDetails.getUsername())
+                    .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
+                .signWith(getSigningKey())
+                .compact();
+
+        return token;
     }
 
     public boolean isTokenValid(String token, UserDetails userDetails) {
-        throw new UnsupportedOperationException("Not yet implemented");
+        String username = extractUsername(token);
+        if(username.equals(userDetails.getUsername()) && !isTokenExpired(token)){
+            return true;
+        }
+        return false;
     }
 
     public String extractUsername(String token) {
-        throw new UnsupportedOperationException("Not yet implemented");
+        return Jwts
+                .parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
     }
 
     private boolean isTokenExpired(String token) {
-        throw new UnsupportedOperationException("Not yet implemented");
+        Date expiry =  Jwts
+                .parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getExpiration();
+
+        return expiry.before(new Date());
     }
 }
