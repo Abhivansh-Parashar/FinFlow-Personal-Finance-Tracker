@@ -1,12 +1,11 @@
 import React from 'react'
-import { getCategoryById, formatCurrency } from '../../utils/dummyData'
+import { formatCurrency, formatDate } from '../../utils/helpers'
 import { ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 
-export default function TransactionRow({ transaction, showActions, onDelete, onEdit }) {
-  const cat = getCategoryById(transaction.categoryId)
+export default function TransactionRow({ transaction, category, showActions, onDelete, onEdit }) {
   const isIncome = transaction.type === 'INCOME'
-  const date = new Date(transaction.date)
-  const formattedDate = date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+  const formattedDate = formatDate(transaction.date)
+  const cat = category || { name: 'Uncategorized', icon: '💰', color: '#666' }
 
   return (
     <tr className="txn-row">

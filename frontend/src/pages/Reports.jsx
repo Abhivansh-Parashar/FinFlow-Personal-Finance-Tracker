@@ -36,6 +36,8 @@ export default function Reports() {
 
   return (
     <div className="page">
+      {error && <div style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', padding: '12px 16px', borderRadius: 8, marginBottom: 20 }}>{error}</div>}
+
       <div className="page-header">
         <div>
           <div className="page-title">Reports & Analytics</div>
@@ -64,9 +66,9 @@ export default function Reports() {
       {/* Quick stats */}
       <div className="grid-4 stagger" style={{ marginBottom: 24 }}>
         {[
-          { label: 'Total Income (6M)',  val: MONTHLY_SUMMARY.reduce((s, m) => s + m.income, 0),  icon: TrendingUp,   color: 'green' },
-          { label: 'Total Expenses (6M)',val: MONTHLY_SUMMARY.reduce((s, m) => s + m.expense, 0), icon: TrendingDown,  color: 'red'   },
-          { label: 'Net Savings (6M)',   val: MONTHLY_SUMMARY.reduce((s, m) => s + (m.income - m.expense), 0), icon: Wallet, color: 'blue' },
+          { label: 'Total Income (6M)',  val: monthlySummary.reduce((s, m) => s + m.income, 0),  icon: TrendingUp,   color: 'green' },
+          { label: 'Total Expenses (6M)',val: monthlySummary.reduce((s, m) => s + m.expense, 0), icon: TrendingDown,  color: 'red'   },
+          { label: 'Net Savings (6M)',   val: monthlySummary.reduce((s, m) => s + (m.income - m.expense), 0), icon: Wallet, color: 'blue' },
           { label: 'Avg Savings Rate',   val: `${Math.round(savingsData.reduce((s, m) => s + m.rate, 0) / savingsData.length)}%`, icon: BarChart2, color: 'purple', prefix: '' },
         ].map(s => (
           <div key={s.label} className="card" style={{ padding: '20px 22px' }}>
@@ -88,7 +90,7 @@ export default function Reports() {
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, marginBottom: 4 }}>Income vs Expenses</div>
           <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 18 }}>6-month comparison</div>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={MONTHLY_SUMMARY} margin={{ top: 5, right: 5, left: -20, bottom: 0 }} barGap={4}>
+            <BarChart data={monthlySummary} margin={{ top: 5, right: 5, left: -20, bottom: 0 }} barGap={4}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="month" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `${v/1000}k`} />
@@ -123,20 +125,20 @@ export default function Reports() {
         {/* Expense pie */}
         <div className="card fade-in">
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, marginBottom: 4 }}>Expense Breakdown</div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 10 }}>By category · June 2025</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 10 }}>By category · {new Date().toISOString().slice(0, 7)}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <ResponsiveContainer width={160} height={160}>
               <PieChart>
-                <Pie data={CATEGORY_BREAKDOWN} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} strokeWidth={0}>
-                  {CATEGORY_BREAKDOWN.map((e, i) => <Cell key={i} fill={e.color} />)}
+                <Pie data={categoryBreakdown} dataKey="value" cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={2} strokeWidth={0}>
+                  {categoryBreakdown.map((e, i) => <Cell key={i} fill={e.color || COLORS[i % COLORS.length]} />)}
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {CATEGORY_BREAKDOWN.slice(0, 5).map(item => (
+              {categoryBreakdown.slice(0, 5).map(item => (
                 <div key={item.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, display: 'inline-block' }} />
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color || '#a78bfa', display: 'inline-block' }} />
                     <span style={{ color: 'var(--text-secondary)' }}>{item.name}</span>
                   </span>
                   <span style={{ fontWeight: 500 }}>₹{item.value.toLocaleString()}</span>

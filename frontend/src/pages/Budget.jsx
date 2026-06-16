@@ -1,29 +1,67 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Target, Plus, AlertTriangle, CheckCircle, X } from 'lucide-react'
-import { BUDGETS, getCategoryById, formatCurrency } from '../utils/dummyData'
+import { budgetService, categoryService } from '../services/api'
 
 export default function Budget() {
-  const [budgets, setBudgets] = useState(BUDGETS)
+  const [budgets, setBudgets] = useState([])
+  const [categories, setCategories] = useState([])
   const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState({ categoryId: '', budgetAmount: '', month: '2025-06' })
+  const [form, setForm] = useState({ categoryId: '', budgetAmount: '', month: new Date().toISOString().slice(0, 7) })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const currentMonth = new Date().toISOString().slice(0, 7)
+      const budgetRes = await budgetService.getAll(currentMonth)
+      setBudgets(budgetRes.data)
+
+      const catRes = await categoryService.getAll()
+      setCategories(catRes.data)
+
+      setError('')
+    } catch (err) {
+      console.error('Error fetching budgets:', err)
+      setError('Failed to load budgets')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getCategoryById = (id) => categories.find(c => c.id === id)
 
   const totalBudget = budgets.reduce((s, b) => s + b.budgetAmount, 0)
   const totalSpent  = budgets.reduce((s, b) => s + b.spentAmount, 0)
   const overBudget  = budgets.filter(b => b.spentAmount > b.budgetAmount)
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!form.categoryId || !form.budgetAmount) return
-    setBudgets([...budgets, { id: Date.now(), categoryId: Number(form.categoryId), month: form.month, budgetAmount: Number(form.budgetAmount), spentAmount: 0 }])
-    setShowModal(false)
-    setForm({ categoryId: '', budgetAmount: '', month: '2025-06' })
+    try {
+      await budgetService.set({
+        categoryId: Number(form.categoryId),
+        budgetAmount: Number(form.budgetAmount),
+        month: form.month
+      })
+      await fetchData()
+      setShowModal(false)
+      setForm({ categoryId: '', budgetAmount: '', month: new Date().toISOString().slice(0, 7) })
+    } catch (err) {
+      setError('Failed to set budget')
+    }
   }
-
   return (
     <div className="page">
+      {error && <div style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', padding: '12px 16px', borderRadius: 8, marginBottom: 20 }}>{error}</div>}
+
       <div className="page-header">
         <div>
           <div className="page-title">Budget</div>
-          <div className="page-subtitle">June 2025 — {overBudget.length} categories over budget</div>
+          <div className="page-subtitle">{form.month} — {overBudget.length} categories over budget</div>
         </div>
         <button className="btn btn-primary" onClick={() => setShowModal(true)}><Plus size={15} /> Set Budget</button>
       </div>
@@ -128,13 +166,7 @@ export default function Budget() {
                 <label className="form-label">Category</label>
                 <select className="form-input" value={form.categoryId} onChange={e => setForm({ ...form, categoryId: e.target.value })}>
                   <option value="">Select category</option>
-                  {/* Categories would be fetched from backend */}
-                  <option value="5">🍽️ Food & Dining</option>
-                  <option value="6">🚗 Transport</option>
-                  <option value="7">🛍️ Shopping</option>
-                  <option value="8">💡 Utilities</option>
-                  <option value="9">🏥 Healthcare</option>
-                  <option value="10">🎮 Entertainment</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
                 </select>
               </div>
               <div className="form-group">

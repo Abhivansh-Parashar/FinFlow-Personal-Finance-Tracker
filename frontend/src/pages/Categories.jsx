@@ -1,30 +1,74 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Plus, X, Tag } from 'lucide-react'
-import { CATEGORIES, TRANSACTIONS } from '../utils/dummyData'
+import { categoryService, transactionService } from '../services/api'
 
 const EMOJI_OPTIONS = ['🍽️','🚗','🛍️','💡','🏥','🎮','📚','🏠','💼','💻','📈','🎁','✈️','🏋️','☕','🎵','💊','🐾','🔧','📱']
 
 export default function Categories() {
-  const [categories, setCategories] = useState(CATEGORIES)
+  const [categories, setCategories] = useState([])
+  const [transactions, setTransactions] = useState([])
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ name: '', type: 'EXPENSE', icon: '🍽️', color: '#ff5c7a' })
   const [filter, setFilter] = useState('ALL')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const catRes = await categoryService.getAll()
+      setCategories(catRes.data)
+      
+      const txnRes = await transactionService.getAll()
+      setTransactions(txnRes.data)
+      
+      setError('')
+    } catch (err) {
+      console.error('Error fetching data:', err)
+      setError('Failed to load categories')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filtered = filter === 'ALL' ? categories : categories.filter(c => c.type === filter)
 
-  const getUsage = (catId) => TRANSACTIONS.filter(t => t.categoryId === catId).length
+  const getUsage = (catId) => transactions.filter(t => t.categoryId === catId).length
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!form.name) return
-    setCategories([...categories, { id: Date.now(), ...form }])
-    setShowModal(false)
-    setForm({ name: '', type: 'EXPENSE', icon: '🍽️', color: '#ff5c7a' })
+    try {
+      await categoryService.create({
+        name: form.name,
+        type: form.type,
+        icon: form.icon,
+        color: form.color
+      })
+      await fetchData()
+      setShowModal(false)
+      setForm({ name: '', type: 'EXPENSE', icon: '🍽️', color: '#ff5c7a' })
+    } catch (err) {
+      setError('Failed to create category')
+    }
   }
 
-  const handleDelete = (id) => setCategories(prev => prev.filter(c => c.id !== id))
+  const handleDelete = async (id) => {
+    try {
+      await categoryService.delete(id)
+      await fetchData()
+    } catch (err) {
+      setError('Failed to delete category')
+    }
+  }
 
   return (
     <div className="page">
+      {error && <div style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', padding: '12px 16px', borderRadius: 8, marginBottom: 20 }}>{error}</div>}
+
       <div className="page-header">
         <div>
           <div className="page-title">Categories</div>

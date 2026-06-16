@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Wallet, Eye, EyeOff, ArrowRight, Check } from 'lucide-react'
+import { authService } from '../services/api'
 
 export default function Register() {
   const { login } = useAuth()
@@ -21,11 +22,21 @@ export default function Register() {
     e.preventDefault()
     if (form.password !== form.confirm) { setError('Passwords do not match'); return }
     setLoading(true)
-    // Simulate server-side registration
-    await new Promise(r => setTimeout(r, 900))
-    const token = `local-${Date.now()}`
-    login({ id: Date.now(), name: form.name, email: form.email, currency: '₹', monthlyBudget: 50000 }, token)
-    navigate('/dashboard')
+    setError('')
+    try {
+      const response = await authService.register({
+        name: form.name,
+        email: form.email,
+        password: form.password
+      })
+      const { token, user } = response.data
+      login(user, token)
+      navigate('/dashboard')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Registration failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

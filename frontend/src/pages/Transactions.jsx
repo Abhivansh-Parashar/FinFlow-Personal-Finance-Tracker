@@ -1,13 +1,39 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Plus, Filter, Search, X, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import TransactionRow from '../components/common/TransactionRow'
-import { TRANSACTIONS, CATEGORIES, getCategoryById, formatCurrency } from '../utils/dummyData'
+import { transactionService, categoryService } from '../services/api'
+
 
 export default function Transactions() {
-  const [transactions, setTransactions] = useState(TRANSACTIONS)
+  const [transactions, setTransactions] = useState([])
+  const [categories, setCategories] = useState([])
   const [filter, setFilter] = useState({ type: 'ALL', search: '', month: '' })
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState({ type: 'EXPENSE', categoryId: '', amount: '', description: '', date: new Date().toISOString().split('T')[0], note: '' })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const txnRes = await transactionService.getAll()
+      setTransactions(txnRes.data)
+      
+      const catRes = await categoryService.getAll()
+      setCategories(catRes.data)
+      
+      setError('')
+    } catch (err) {
+      console.error('Error fetching data:', err)
+      setError('Failed to load transactions')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filtered = transactions.filter(t => {
     if (filter.type !== 'ALL' && t.type !== filter.type) return false
@@ -19,17 +45,35 @@ export default function Transactions() {
   const totalIncome  = filtered.filter(t => t.type === 'INCOME').reduce((s, t) => s + t.amount, 0)
   const totalExpense = filtered.filter(t => t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.amount || !form.description || !form.categoryId) return
-    const newTxn = { ...form, id: Date.now(), amount: Number(form.amount), categoryId: Number(form.categoryId) }
-    setTransactions([newTxn, ...transactions])
-    setShowModal(false)
-    setForm({ type: 'EXPENSE', categoryId: '', amount: '', description: '', date: new Date().toISOString().split('T')[0], note: '' })
+    try {
+      await transactionService.create({
+        type: form.type,
+        categoryId: Number(form.categoryId),
+        amount: Number(form.amount),
+        description: form.description,
+        date: form.date,
+        note: form.note
+      })
+      await fetchData()
+      setShowModal(false)
+      setForm({ type: 'EXPENSE', categoryId: '', amount: '', description: '', date: new Date().toISOString().split('T')[0], note: '' })
+    } catch (err) {
+      setError('Failed to create transaction')
+    }
   }
 
-  const handleDelete = (id) => setTransactions(prev => prev.filter(t => t.id !== id))
+  const handleDelete = async (id) => {
+    try {
+      await transactionService.delete(id)
+      await fetchData()
+    } catch (err) {
+      setError('Failed to delete transaction')
+    }
+  }
 
-  const relevantCategories = CATEGORIES.filter(c => c.type === form.type)
+  const relevantCategories = categories.filter(c => c.type === form.type)
 
   return (
     <div className="page">

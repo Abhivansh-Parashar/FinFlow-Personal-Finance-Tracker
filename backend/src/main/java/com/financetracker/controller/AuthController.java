@@ -30,7 +30,15 @@ public class AuthController {
 
     private final AuthService authService;
 
-    // TODO: Implement @PostMapping("/register")
+    @PostMapping("/register")
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request){
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(authService.register(request));
+    }
 
-    // TODO: Implement @PostMapping("/login")
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request){
+        return  ResponseEntity.ok(authService.login(request));
+    }
 }

@@ -1,20 +1,51 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { TrendingUp, ArrowUpRight, Plus } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
-import { TRANSACTIONS, CATEGORIES, MONTHLY_SUMMARY, formatCurrency, getCategoryById } from '../utils/dummyData'
+import { transactionService, reportService, categoryService } from '../services/api'
 import TransactionRow from '../components/common/TransactionRow'
 import StatCard from '../components/common/StatCard'
 
-const incomeCategories = CATEGORIES.filter(c => c.type === 'INCOME')
-
 export default function Income() {
-  const incomeTransactions = TRANSACTIONS.filter(t => t.type === 'INCOME')
-  const totalIncome = incomeTransactions.reduce((s, t) => s + t.amount, 0)
-  const juneIncome = incomeTransactions.filter(t => t.date.startsWith('2025-06')).reduce((s, t) => s + t.amount, 0)
+  const [incomeTransactions, setIncomeTransactions] = useState([])
+  const [categories, setCategories] = useState([])
+  const [monthlySummary, setMonthlySummary] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const chartData = MONTHLY_SUMMARY.map(m => ({ month: m.month, income: m.income }))
+  useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      const txnRes = await transactionService.getAll()
+      const incomeOnly = txnRes.data.filter(t => t.type === 'INCOME')
+      setIncomeTransactions(incomeOnly)
+      
+      const catRes = await categoryService.getAll()
+      setCategories(catRes.data)
+      
+      const summaryRes = await reportService.monthlySummary('6')
+      setMonthlySummary(summaryRes.data)
+      
+      setError('')
+    } catch (err) {
+      console.error('Error fetching income data:', err)
+      setError('Failed to load income data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const incomeCategories = categories.filter(c => c.type === 'INCOME')
+  const totalIncome = incomeTransactions.reduce((s, t) => s + t.amount, 0)
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const monthIncome = incomeTransactions.filter(t => t.date.startsWith(currentMonth)).reduce((s, t) => s + t.amount, 0)
+
+  const chartData = monthlySummary.map(m => ({ month: m.month, income: m.income }))
 
   const categoryStats = incomeCategories.map(cat => ({
     ...cat,
@@ -24,6 +55,8 @@ export default function Income() {
 
   return (
     <div className="page">
+      {error && <div style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', padding: '12px 16px', borderRadius: 8, marginBottom: 20 }}>{error}</div>}
+
       <div className="page-header">
         <div>
           <div className="page-title">Income</div>
@@ -34,7 +67,7 @@ export default function Income() {
 
       <div className="grid-4 stagger" style={{ marginBottom: 24 }}>
         <StatCard title="Total Income"   value={totalIncome}  change={8.2} icon={TrendingUp} accentColor="green" />
-        <StatCard title="This Month"     value={juneIncome}   change={5.3} icon={ArrowUpRight} accentColor="blue" />
+        <StatCard title="This Month"     value={monthIncome}   change={5.3} icon={ArrowUpRight} accentColor="blue" />
         <StatCard title="Avg / Month"    value={Math.round(totalIncome / 6)} change={3.1} icon={TrendingUp} accentColor="purple" />
         <StatCard title="Income Sources" value={categoryStats.length} prefix="" change={0} icon={TrendingUp} accentColor="amber" />
       </div>

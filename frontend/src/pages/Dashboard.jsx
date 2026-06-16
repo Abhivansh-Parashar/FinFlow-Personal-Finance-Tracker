@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -10,7 +10,8 @@ import {
 } from 'lucide-react'
 import StatCard from '../components/common/StatCard'
 import TransactionRow from '../components/common/TransactionRow'
-import { TRANSACTIONS, MONTHLY_SUMMARY, CATEGORY_BREAKDOWN, getCategoryById, formatCurrency } from '../utils/dummyData'
+import { transactionService, reportService, categoryService } from '../services/api'
+import { useAuth } from '../context/AuthContext'
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
@@ -39,22 +40,65 @@ const CustomPieTooltip = ({ active, payload }) => {
 }
 
 export default function Dashboard() {
-  const recent = TRANSACTIONS.slice(0, 5)
-  const juneIncome = TRANSACTIONS.filter(t => t.date.startsWith('2025-06') && t.type === 'INCOME').reduce((s, t) => s + t.amount, 0)
-  const juneExpense = TRANSACTIONS.filter(t => t.date.startsWith('2025-06') && t.type === 'EXPENSE').reduce((s, t) => s + t.amount, 0)
-  const savings = juneIncome - juneExpense
-  const savingsRate = ((savings / juneIncome) * 100).toFixed(0)
+  const { user } = useAuth()
+  const [transactions, setTransactions] = useState([])
+  const [monthlySummary, setMonthlySummary] = useState([])
+  const [categoryBreakdown, setCategoryBreakdown] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true)
+        // Fetch recent transactions
+        const txnRes = await transactionService.getAll({ limit: 5, sort: 'date,desc' })
+        setTransactions(txnRes.data)
+
+        // Fetch monthly summary for reports
+        const summaryRes = await reportService.monthlySummary('6')
+        setMonthlySummary(summaryRes.data)
+
+        // Get current month for category breakdown
+        const currentMonth = new Date().toISOString().slice(0, 7)
+        const breakdownRes = await reportService.categoryBreakdown(currentMonth)
+        setCategoryBreakdown(breakdownRes.data)
+
+        setError('')
+      } catch (err) {
+        console.error('Error fetching dashboard data:', err)
+        setError('Failed to load dashboard data')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  const recent = transactions.slice(0, 5)
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const monthIncome = transactions
+    .filter(t => t.date.startsWith(currentMonth) && t.type === 'INCOME')
+    .reduce((s, t) => s + t.amount, 0)
+  const monthExpense = transactions
+    .filter(t => t.date.startsWith(currentMonth) && t.type === 'EXPENSE')
+    .reduce((s, t) => s + t.amount, 0)
+  const savings = monthIncome - monthExpense
+  const savingsRate = monthIncome > 0 ? ((savings / monthIncome) * 100).toFixed(0) : 0
 
   return (
     <div className="page">
+      {error && <div style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', padding: '12px 16px', borderRadius: 8, marginBottom: 20 }}>{error}</div>}
+
       {/* Welcome banner */}
       <div className="welcome-banner fade-in">
         <div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.4rem', fontWeight: 700, marginBottom: 4 }}>
-            Good morning, Abhivansh 👋
+            Good morning, {user?.name || 'User'} 👋
           </h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-            June 2025 — You've saved <strong style={{ color: 'var(--accent-green)' }}>{savingsRate}%</strong> of your income this month.
+            {currentMonth} — You've saved <strong style={{ color: 'var(--accent-green)' }}>{savingsRate}%</strong> of your income this month.
           </p>
         </div>
         <Link to="/transactions" className="btn btn-primary">
@@ -64,10 +108,10 @@ export default function Dashboard() {
 
       {/* Stat cards */}
       <div className="grid-4 stagger" style={{ marginBottom: 24 }}>
-        <StatCard title="Total Income"  value={juneIncome}  change={8.2}  icon={TrendingUp}   accentColor="green" />
-        <StatCard title="Total Expense" value={juneExpense} change={-5.1} icon={TrendingDown}  accentColor="red"   />
+        <StatCard title="Total Income"  value={monthIncome}  change={8.2}  icon={TrendingUp}   accentColor="green" />
+        <StatCard title="Total Expense" value={monthExpense} change={-5.1} icon={TrendingDown}  accentColor="red"   />
         <StatCard title="Net Savings"   value={savings}     change={12.4} icon={Wallet}        accentColor="blue"  />
-        <StatCard title="Budget Used"   value={37500}       change={-2.3} icon={Target}        accentColor="amber" prefix="₹" />
+        <StatCard title="Budget Used"   value={0}       change={-2.3} icon={Target}        accentColor="amber" prefix="₹" />
       </div>
 
       {/* Charts row */}
@@ -89,7 +133,7 @@ export default function Dashboard() {
             </div>
           </div>
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={MONTHLY_SUMMARY} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={monthlySummary} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#00c896" stopOpacity={0.25} />
@@ -113,20 +157,20 @@ export default function Dashboard() {
         {/* Pie chart */}
         <div className="card fade-in" style={{ animationDelay: '0.15s' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>Spending Breakdown</div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 16 }}>June 2025</div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: 16 }}>{currentMonth}</div>
           <ResponsiveContainer width="100%" height={160}>
             <PieChart>
-              <Pie data={CATEGORY_BREAKDOWN} dataKey="value" cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={2} strokeWidth={0}>
-                {CATEGORY_BREAKDOWN.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
+              <Pie data={categoryBreakdown} dataKey="value" cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={2} strokeWidth={0}>
+                {categoryBreakdown.map((entry, idx) => <Cell key={idx} fill={entry.color || '#a78bfa'} />)}
               </Pie>
               <Tooltip content={<CustomPieTooltip />} />
             </PieChart>
           </ResponsiveContainer>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-            {CATEGORY_BREAKDOWN.slice(0, 4).map(item => (
+            {categoryBreakdown.slice(0, 4).map(item => (
               <div key={item.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.78rem' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color, display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color || '#a78bfa', display: 'inline-block', flexShrink: 0 }} />
                   <span style={{ color: 'var(--text-secondary)' }}>{item.name}</span>
                 </span>
                 <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>₹{item.value.toLocaleString()}</span>
@@ -178,4 +222,5 @@ export default function Dashboard() {
       `}</style>
     </div>
   )
+
 }
