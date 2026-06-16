@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Wallet, Eye, EyeOff, ArrowRight } from 'lucide-react'
+import { authService } from '../services/api'
 
 export default function Login() {
   const { login } = useAuth()
@@ -15,24 +16,16 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    // Simulate API call (replace with real API call in future)
-    await new Promise(r => setTimeout(r, 600))
-    if (form.email && form.password) {
-      // create a simple local token and a basic user object
-      const token = `local-${Date.now()}`
-      const nameFromEmail = (email) => {
-        try {
-          const name = email.split('@')[0].replace(/[._\-\d]+/g, ' ')
-          return name.split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ') || 'User'
-        } catch (e) { return 'User' }
-      }
-      const userObj = { id: Date.now(), name: nameFromEmail(form.email), email: form.email, currency: '₹', monthlyBudget: 50000 }
-      login(userObj, token)
+    try {
+      const response = await authService.login({ email: form.email, password: form.password })
+      const { token, user } = response.data
+      login(user, token)
       navigate('/dashboard')
-    } else {
-      setError('Invalid credentials. Please provide email and password.')
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed. Please check your credentials.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
