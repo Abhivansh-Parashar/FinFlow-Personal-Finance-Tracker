@@ -5,6 +5,8 @@ import com.financetracker.dto.response.TransactionResponse;
 import com.financetracker.enums.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import java.nio.file.AccessDeniedException;
 import java.util.List;
 
 /**
@@ -30,7 +32,7 @@ public interface TransactionService {
 
     Page<TransactionResponse> getAllTransactions(TransactionType type, String month, Long categoryId, Pageable pageable);
 
-    TransactionResponse updateTransaction(Long id, TransactionRequest request);
+    TransactionResponse updateTransaction(Long id, TransactionRequest request) throws AccessDeniedException;
 
-    void deleteTransaction(Long id);
+    void deleteTransaction(Long id) throws AccessDeniedException;
 }

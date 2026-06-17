@@ -12,6 +12,7 @@ import com.financetracker.repository.TransactionRepository;
 import com.financetracker.repository.UserRepository;
 import com.financetracker.service.TransactionService;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.resource.transaction.TransactionRequiredForJoinException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -19,6 +20,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.AccessDeniedException;
 import java.util.List;
 
 /**
@@ -133,19 +135,79 @@ public class TransactionServiceImpl implements TransactionService {
     @Transactional(readOnly = true)
     public Page<TransactionResponse> getAllTransactions(TransactionType type, String month, Long categoryId, Pageable pageable) {
         User user = getCurrentUser();
+        Page<Transaction> transactions;
 
+        if(categoryId != null){
+            transactions = transactionRepository.findAllByUserIdAndCategoryId(user.getId(), categoryId, pageable);
+        }
+        else if(type != null){
+            transactions = transactionRepository.findAllByUserIdAndTransactionType(user.getId(), type, pageable);
+        }
+        else {
+            transactions = transactionRepository.findAllByUserId(user.getId(), pageable);
+        }
+
+        return transactions.map(transaction ->
+                TransactionResponse.builder()
+                        .id(transaction.getId())
+                        .description(transaction.getDescription())
+                        .amount(transaction.getAmount())
+                        .transactionType(transaction.getTransactionType())
+                        .date(transaction.getDate())
+                        .note(transaction.getNote())
+                        .categoryId(transaction.getCategory().getId())
+                        .categoryName(transaction.getCategory().getName())
+                        .categoryIcon(transaction.getCategory().getIcon())
+                        .createdAt(transaction.getCreatedAt())
+                        .build()
+        );
+    }
+
+    @Override
+    public TransactionResponse updateTransaction(Long id, TransactionRequest request) throws AccessDeniedException {
+        User user = getCurrentUser();
+
+
+        Transaction transaction = transactionRepository.findById(id).orElseThrow();
+        if(!transaction.getUser().getId().equals(user.getId())){
+            throw new AccessDeniedException(
+                    "No transaction found for the user."
+            );
+        }
+
+        transaction.setTransactionType(request.getTransactionType());
+        transaction.setAmount(request.getAmount());
+        transaction.setDescription(request.getDescription());
+        transaction.setNote(request.getNote());
+        transaction.setCategory(categoryRepository.findById(request.getCategoryId()).orElseThrow());
+
+        Transaction savedTransaction = transactionRepository.save(transaction);
+
+        return TransactionResponse.builder()
+                .id(savedTransaction.getId())
+                .description(savedTransaction.getDescription())
+                .amount(request.getAmount())
+                .transactionType(savedTransaction.getTransactionType())
+                .date(savedTransaction.getDate())
+                .note(savedTransaction.getNote())
+                .categoryId(savedTransaction.getCategory().getId())
+                .categoryName(savedTransaction.getCategory().getName())
+                .categoryIcon(savedTransaction.getCategory().getIcon())
+                .createdAt(savedTransaction.getCreatedAt())
+                .build();
 
     }
 
     @Override
-    public TransactionResponse updateTransaction(Long id, TransactionRequest request) {
-        // TODO: Implement
-        throw new UnsupportedOperationException("Not yet implemented");
-    }
+    public void deleteTransaction(Long id) throws AccessDeniedException {
+        User user = getCurrentUser();
 
-    @Override
-    public void deleteTransaction(Long id) {
-        // TODO: Implement
-        throw new UnsupportedOperationException("Not yet implemented");
+        Transaction transaction = transactionRepository.findById(id).orElseThrow();
+
+        if(!transaction.getUser().getId().equals(user.getId())){
+            throw new AccessDeniedException("No transaction found for the user.");
+        }
+
+        transactionRepository.deleteById(id);
     }
 }
