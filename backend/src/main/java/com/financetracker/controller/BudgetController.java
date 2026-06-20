@@ -1,13 +1,14 @@
 package com.financetracker.controller;
 
 import com.financetracker.dto.request.BudgetRequest;
-import com.financetracker.dto.response.ApiResponse;
 import com.financetracker.dto.response.BudgetResponse;
 import com.financetracker.service.BudgetService;
-import jakarta.validation.Valid;
+import jakarta.websocket.server.PathParam;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.nio.file.AccessDeniedException;
 import java.util.List;
 
 /**
@@ -28,6 +29,25 @@ public class BudgetController {
 
     private final BudgetService budgetService;
 
-    // TODO: Implement endpoints
+    @PostMapping
+    public ResponseEntity<BudgetResponse> setBudget(@RequestBody BudgetRequest request){
+        return ResponseEntity.status(200).body(budgetService.setBudget(request));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<BudgetResponse>> getBudgetsByMonth(@RequestParam("month") String month){
+        return ResponseEntity.status(200).body(budgetService.getBudgetsByMonth(month));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<BudgetResponse> getBudgetById(@PathVariable long id) throws AccessDeniedException {
+        return ResponseEntity.status(200).body(budgetService.getBudgetById(id));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteBudget(@PathVariable long id) throws AccessDeniedException {
+        budgetService.deleteBudget(id);
+        return ResponseEntity.noContent().build();
+    }
 
 }
