@@ -2,6 +2,8 @@ package com.financetracker.service;
 
 import com.financetracker.dto.request.BudgetRequest;
 import com.financetracker.dto.response.BudgetResponse;
+
+import java.nio.file.AccessDeniedException;
 import java.util.List;
 
 /**
@@ -20,7 +22,7 @@ public interface BudgetService {
 
     List<BudgetResponse> getBudgetsByMonth(String month);
 
-    BudgetResponse getBudgetById(Long id);
+    BudgetResponse getBudgetById(Long id) throws AccessDeniedException;
 
-    void deleteBudget(Long id);
+    void deleteBudget(Long id) throws AccessDeniedException;
 }
