@@ -51,4 +51,8 @@ public class Transaction {
     private void onUpdate(){
         updatedAt = LocalDateTime.now();
     }
+
+    public BigDecimal get() {
+        return null;
+    }
 }
