@@ -6,6 +6,7 @@ import com.financetracker.service.ReportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 /**
@@ -13,10 +14,9 @@ import java.util.List;
  *
  * Base URL: /api/v1/reports
  *
- * TODO (Milestone 6):
- *  GET /monthly-summary?months=6     → getMonthlySummary()      → 200
- *  GET /category-breakdown?month=    → getCategoryBreakdown()   → 200
- *  GET /yearly-summary?year=2025     → getYearlySummary()       → 200
+ * GET /monthly-summary?months=6
+ * GET /category-breakdown?month=2025-06
+ * GET /yearly-summary?year=2025
  */
 @RestController
 @RequestMapping("/api/v1/reports")
@@ -25,6 +25,18 @@ public class ReportController {
 
     private final ReportService reportService;
 
-    // TODO: Implement endpoints
+    @GetMapping("/monthly-summary")
+    public ResponseEntity<List<MonthlySummaryResponse>> getMonthlySummary(@RequestParam int months) {
+        return ResponseEntity.ok(reportService.getMonthlySummary(months));
+    }
 
+    @GetMapping("/category-breakdown")
+    public ResponseEntity<List<CategoryBreakdownResponse>> getCategoryBreakdown(@RequestParam String month) {
+        return ResponseEntity.ok(reportService.getCategoryBreakdown(month));
+    }
+
+    @GetMapping("/yearly-summary")
+    public ResponseEntity<List<MonthlySummaryResponse>> getYearlySummary(@RequestParam int year) {
+        return ResponseEntity.ok(reportService.getYearlySummary(year));
+    }
 }
