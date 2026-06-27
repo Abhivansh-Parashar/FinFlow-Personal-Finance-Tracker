@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Wallet, Eye, EyeOff, ArrowRight } from 'lucide-react'
-import { authService } from '../services/api'
+import { authService, getAuthPayload } from '../services/api'
 
 export default function Login() {
   const { login } = useAuth()
@@ -18,7 +18,12 @@ export default function Login() {
     setError('')
     try {
       const response = await authService.login({ email: form.email, password: form.password })
-      const { token, user } = response.data
+      const { token, user } = getAuthPayload(response)
+
+      if (!token || !user) {
+        throw new Error('Invalid login response from server')
+      }
+
       login(user, token)
       navigate('/dashboard')
     } catch (err) {
@@ -77,7 +82,7 @@ export default function Login() {
             {error && <div style={{ color: 'var(--accent-red)', fontSize: '0.82rem', background: 'var(--accent-red-dim)', padding: '8px 12px', borderRadius: 8 }}>{error}</div>}
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <a href="#" style={{ fontSize: '0.8rem', color: 'var(--accent-green)' }}>Forgot password?</a>
+              <span className="tooltip" data-tip="Coming soon" style={{ fontSize: '0.8rem', color: 'var(--accent-green)', cursor: 'not-allowed', opacity: 0.7 }}>Forgot password?</span>
             </div>
 
             <button type="submit" className="btn btn-primary" style={{ padding: '12px', justifyContent: 'center', fontSize: '0.95rem', marginTop: 4 }} disabled={loading}>

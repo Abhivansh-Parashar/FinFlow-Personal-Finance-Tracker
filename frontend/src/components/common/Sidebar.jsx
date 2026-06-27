@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import {
@@ -18,10 +18,9 @@ const NAV_ITEMS = [
   { to: '/profile',      icon: User,            label: 'Profile' },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed = false, onToggle }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
-  const [collapsed, setCollapsed] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -41,7 +40,7 @@ export default function Sidebar() {
       </div>
 
       {/* Collapse toggle */}
-      <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
+      <button className="collapse-btn" onClick={onToggle}>
         {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 

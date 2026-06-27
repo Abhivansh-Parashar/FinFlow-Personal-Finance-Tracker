@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Bell, Search, Plus } from 'lucide-react'
 
@@ -13,10 +13,20 @@ const PAGE_TITLES = {
   '/profile':      { title: 'Profile',          subtitle: 'Manage your account settings.' },
 }
 
-export default function Topbar({ sidebarWidth = 240 }) {
+export default function Topbar({ sidebarWidth = 240, onSearch }) {
   const { pathname } = useLocation()
   const info = PAGE_TITLES[pathname] || { title: 'FinFlow', subtitle: '' }
   const [searchVal, setSearchVal] = useState('')
+  const debounceRef = useRef(null)
+
+  useEffect(() => {
+    if (!onSearch) return
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      onSearch(searchVal)
+    }, 300)
+    return () => clearTimeout(debounceRef.current)
+  }, [searchVal, onSearch])
 
   return (
     <header className="topbar" style={{ left: sidebarWidth }}>

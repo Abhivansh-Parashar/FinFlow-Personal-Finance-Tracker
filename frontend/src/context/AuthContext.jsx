@@ -17,6 +17,25 @@ export const AuthProvider = ({ children }) => {
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('token'))
 
+  // Listen for storage changes (from other tabs or API interceptor)
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'token') {
+        setIsAuthenticated(!!e.newValue)
+      }
+      if (e.key === 'user') {
+        try {
+          setUser(e.newValue ? JSON.parse(e.newValue) : null)
+        } catch (err) {
+          setUser(null)
+        }
+      }
+    }
+
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
   useEffect(() => {
     // keep user object in localStorage when it changes
     if (user) {
@@ -40,6 +59,11 @@ export const AuthProvider = ({ children }) => {
     setUser(null)
     setIsAuthenticated(false)
   }
+
+  // Expose a global logout function for API interceptor
+  useEffect(() => {
+    window.__authLogout = logout
+  }, [logout])
 
   return (
     <AuthContext.Provider value={{ user, isAuthenticated, login, logout, setUser }}>

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Wallet, Eye, EyeOff, ArrowRight, Check } from 'lucide-react'
-import { authService } from '../services/api'
+import { authService, getAuthPayload } from '../services/api'
 
 export default function Register() {
   const { login } = useAuth()
@@ -29,7 +29,12 @@ export default function Register() {
         email: form.email,
         password: form.password
       })
-      const { token, user } = response.data
+      const { token, user } = getAuthPayload(response)
+
+      if (!token || !user) {
+        throw new Error('Invalid registration response from server')
+      }
+
       login(user, token)
       navigate('/dashboard')
     } catch (err) {
@@ -74,7 +79,7 @@ export default function Register() {
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div className="form-group">
               <label className="form-label">Full Name</label>
-              <input type="text" className="form-input" placeholder="Abhivansh Singh"
+              <input type="text" className="form-input" placeholder="John Doe"
                 value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required />
             </div>
             <div className="form-group">
@@ -119,7 +124,7 @@ export default function Register() {
             </button>
 
             <p style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-              By registering, you agree to our <a href="#" style={{ color: 'var(--accent-green)' }}>Terms of Service</a> and <a href="#" style={{ color: 'var(--accent-green)' }}>Privacy Policy</a>
+              By registering, you agree to our <span className="tooltip" data-tip="Coming soon" style={{ color: 'var(--accent-green)', cursor: 'not-allowed', opacity: 0.7 }}>Terms of Service</span> and <span className="tooltip" data-tip="Coming soon" style={{ color: 'var(--accent-green)', cursor: 'not-allowed', opacity: 0.7 }}>Privacy Policy</span>
             </p>
           </form>
 
