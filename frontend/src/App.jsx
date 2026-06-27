@@ -1,5 +1,5 @@
-import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import MainLayout from './pages/MainLayout'
 import Dashboard from './pages/Dashboard'
@@ -21,6 +21,21 @@ const ProtectedRoute = ({ children }) => {
 const PublicRoute = ({ children }) => {
   const { isAuthenticated } = useAuth()
   return isAuthenticated ? <Navigate to="/dashboard" replace /> : children
+}
+
+function UnauthorizedListener() {
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      navigate('/login', { replace: true })
+    }
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized)
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized)
+  }, [navigate])
+
+  return null
 }
 
 function AppRoutes() {
@@ -48,6 +63,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <UnauthorizedListener />
         <AppRoutes />
       </BrowserRouter>
     </AuthProvider>
