@@ -6,9 +6,6 @@ import com.financetracker.enums.TransactionType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.nio.file.AccessDeniedException;
-import java.util.List;
-
 /**
  * Service contract for transaction CRUD and querying.
  *
@@ -32,7 +29,7 @@ public interface TransactionService {
 
     Page<TransactionResponse> getAllTransactions(TransactionType type, String month, Long categoryId, Pageable pageable);
 
-    TransactionResponse updateTransaction(Long id, TransactionRequest request) throws AccessDeniedException;
+    TransactionResponse updateTransaction(Long id, TransactionRequest request);
 
-    void deleteTransaction(Long id) throws AccessDeniedException;
+    void deleteTransaction(Long id);
 }

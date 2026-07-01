@@ -2,7 +2,6 @@ package com.financetracker.controller;
 
 import com.financetracker.dto.request.LoginRequest;
 import com.financetracker.dto.request.RegisterRequest;
-import com.financetracker.dto.response.ApiResponse;
 import com.financetracker.dto.response.AuthResponse;
 import com.financetracker.service.AuthService;
 import jakarta.validation.Valid;

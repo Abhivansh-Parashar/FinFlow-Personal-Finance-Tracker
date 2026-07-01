@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
  *  - Add @NotNull, @Positive, @NotBlank validations
  */
 @Entity
-@Table(name = "transacctions")
+@Table(name = "transactions")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Transaction {
     @Id
@@ -50,9 +50,5 @@ public class Transaction {
     @PreUpdate
     private void onUpdate(){
         updatedAt = LocalDateTime.now();
-    }
-
-    public BigDecimal get() {
-        return null;
     }
 }

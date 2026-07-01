@@ -1,30 +1,20 @@
 package com.financetracker.util;
 
 import com.financetracker.entity.User;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
 
-/**
- * Utility class for accessing the currently authenticated user.
- *
- * TODO (Milestone 1):
- *  - getCurrentUser(): cast principal from SecurityContextHolder to User entity
- *  - getCurrentUserId(): return the authenticated user's ID
- *
- * Usage in services:
- *   User currentUser = SecurityUtils.getCurrentUser();
- */
-@Component
 public class SecurityUtils {
 
     public static User getCurrentUser() {
-        // TODO: Implement
-        // return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        throw new UnsupportedOperationException("Not yet implemented");
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getPrincipal() instanceof User) {
+            return (User) authentication.getPrincipal();
+        }
+        throw new RuntimeException("No authenticated user found in context");
     }
 
     public static Long getCurrentUserId() {
-        // TODO: Implement
-        throw new UnsupportedOperationException("Not yet implemented");
+        return getCurrentUser().getId();
     }
 }

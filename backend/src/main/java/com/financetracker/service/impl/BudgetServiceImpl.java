@@ -6,13 +6,13 @@ import com.financetracker.entity.Budget;
 import com.financetracker.entity.Category;
 import com.financetracker.entity.Transaction;
 import com.financetracker.entity.User;
+import com.financetracker.exception.ResourceNotFoundException;
 import com.financetracker.repository.BudgetRepository;
 import com.financetracker.repository.CategoryRepository;
 import com.financetracker.repository.TransactionRepository;
 import com.financetracker.repository.UserRepository;
 import com.financetracker.service.BudgetService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cglib.core.Local;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -20,12 +20,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.nio.file.AccessDeniedException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Implementation of {@link BudgetService}.
@@ -59,31 +59,33 @@ public class BudgetServiceImpl implements BudgetService {
     }
     @Override
     public BudgetResponse setBudget(BudgetRequest request) {
-
         User user = getCurrentUser();
 
-        Category category = categoryRepository
-                .findById(request.getCategoryId())
-                .orElseThrow();
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
 
-        Budget budget = Budget.builder()
-                .budgetAmount(request.getBudgetAmount())
-                .spentAmount(BigDecimal.ZERO)
-                .month(request.getMonth())
-                .user(user)
-                .category(category)
-                .build();
+        // UPSERT: check if budget already exists for this user/category/month
+        Optional<Budget> existing = budgetRepository.findByUserIdAndCategoryIdAndMonth(
+                user.getId(), category.getId(), request.getMonth());
+
+        Budget budget;
+        if (existing.isPresent()) {
+            // Update existing
+            budget = existing.get();
+            budget.setBudgetAmount(request.getBudgetAmount());
+        } else {
+            // Create new
+            budget = Budget.builder()
+                    .budgetAmount(request.getBudgetAmount())
+                    .spentAmount(BigDecimal.ZERO)
+                    .month(request.getMonth())
+                    .user(user)
+                    .category(category)
+                    .build();
+        }
 
         budget = budgetRepository.save(budget);
-
-        return BudgetResponse.builder()
-                .categoryId(budget.getCategory().getId())
-                .categoryName(budget.getCategory().getName())
-                .categoryIcon(budget.getCategory().getIcon())
-                .budgetAmount(budget.getBudgetAmount())
-                .spentAmount(budget.getSpentAmount())
-                .month(budget.getMonth())
-                .build();
+        return buildResponse(budget, budget.getSpentAmount());
     }
 
     @Override
@@ -163,12 +165,12 @@ public class BudgetServiceImpl implements BudgetService {
 
     @Override
     @Transactional(readOnly = true)
-    public BudgetResponse getBudgetById(Long id) throws AccessDeniedException {
+    public BudgetResponse getBudgetById(Long id) {
         User user = getCurrentUser();
         Budget budget = budgetRepository.findById(id).orElseThrow();
 
         if(!budget.getUser().equals(user)){
-            throw new AccessDeniedException("Budget doesn't belong to this user.");
+            throw new RuntimeException("Access denied: Budget doesn't belong to this user.");
         }
         BigDecimal percentageUsed = BigDecimal.ZERO;
 
@@ -192,14 +194,39 @@ public class BudgetServiceImpl implements BudgetService {
     }
 
     @Override
-    public void deleteBudget(Long id) throws AccessDeniedException {
+    public void deleteBudget(Long id) {
         User user = getCurrentUser();
         Budget budget = budgetRepository.findById(id).orElseThrow();
 
         if(!budget.getUser().getId().equals(user.getId())){
-            throw new AccessDeniedException("Budget doesn't belong to this user.");
+            throw new RuntimeException("Access denied: Budget doesn't belong to this user.");
         }
 
         budgetRepository.deleteById(id);
+    }
+
+    private BudgetResponse buildResponse(Budget budget, BigDecimal spentAmount) {
+        BigDecimal budgetAmount = budget.getBudgetAmount();
+        BigDecimal remaining    = budgetAmount.subtract(spentAmount);
+        BigDecimal percentageUsed = BigDecimal.ZERO;
+
+        if (budgetAmount.compareTo(BigDecimal.ZERO) > 0) {
+            percentageUsed = spentAmount
+                    .divide(budgetAmount, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100))
+                    .setScale(2, RoundingMode.HALF_UP);
+        }
+
+        return BudgetResponse.builder()
+                .id(budget.getId())
+                .categoryId(budget.getCategory().getId())
+                .categoryName(budget.getCategory().getName())
+                .categoryIcon(budget.getCategory().getIcon())
+                .budgetAmount(budgetAmount)
+                .spentAmount(spentAmount)
+                .remainingAmount(remaining)
+                .percentageUsed(percentageUsed)
+                .month(budget.getMonth())
+                .build();
     }
 }

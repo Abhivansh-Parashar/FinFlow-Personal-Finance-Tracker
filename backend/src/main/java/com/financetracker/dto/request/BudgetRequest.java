@@ -12,7 +12,7 @@ import java.time.YearMonth;
 public class BudgetRequest {
     @NotNull
     private Long categoryId;
-    @NotBlank
+    @NotNull
     @Positive
     private  BigDecimal budgetAmount;
     @NotBlank

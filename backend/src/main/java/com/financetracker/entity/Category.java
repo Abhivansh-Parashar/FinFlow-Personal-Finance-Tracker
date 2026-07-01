@@ -29,7 +29,9 @@ public class Category {
     private String color;
     @Enumerated(EnumType.STRING)
     private TransactionType type;
-    private boolean isDefault;
+    @Column(name = "is_default", nullable = false)
+    @Builder.Default
+    private Boolean isDefault = false;
     private LocalDateTime createdAt;
     @ManyToOne
     @JoinColumn(name = "user_id")

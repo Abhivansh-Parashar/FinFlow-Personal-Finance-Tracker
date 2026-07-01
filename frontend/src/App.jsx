@@ -12,6 +12,8 @@ import Reports from './pages/Reports'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuth()
@@ -41,8 +43,10 @@ function UnauthorizedListener() {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/login"    element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+      <Route path="/login"            element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/register"         element={<PublicRoute><Register /></PublicRoute>} />
+      <Route path="/forgot-password"  element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+      <Route path="/reset-password"   element={<PublicRoute><ResetPassword /></PublicRoute>} />
       <Route path="/" element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard"    element={<Dashboard />} />

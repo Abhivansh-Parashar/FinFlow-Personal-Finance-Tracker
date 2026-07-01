@@ -24,5 +24,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     List<Category> findAllByUserIdAndType(Long userId, TransactionType type);
     List<Category> findAllByIsDefaultTrue();
     boolean existsByNameAndUserId(String name, Long userId);
+    List<Category> findAllByIsDefaultTrueAndType(TransactionType type);
 
 }

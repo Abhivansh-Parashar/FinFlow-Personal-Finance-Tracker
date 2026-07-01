@@ -1,6 +1,5 @@
 package com.financetracker.service.impl;
 
-import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateDeserializer;
 import com.financetracker.dto.response.CategoryBreakdownResponse;
 import com.financetracker.dto.response.MonthlySummaryResponse;
 import com.financetracker.entity.Category;
@@ -11,7 +10,6 @@ import com.financetracker.repository.TransactionRepository;
 import com.financetracker.repository.UserRepository;
 import com.financetracker.service.ReportService;
 import lombok.RequiredArgsConstructor;
-import org.apache.tomcat.util.http.parser.Authorization;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
