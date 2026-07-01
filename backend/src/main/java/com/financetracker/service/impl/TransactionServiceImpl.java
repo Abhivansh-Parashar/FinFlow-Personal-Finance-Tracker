@@ -12,7 +12,6 @@ import com.financetracker.repository.TransactionRepository;
 import com.financetracker.repository.UserRepository;
 import com.financetracker.service.TransactionService;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.resource.transaction.TransactionRequiredForJoinException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -20,36 +19,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.AccessDeniedException;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
 
-/**
- * Implementation of {@link TransactionService}.
- *
- * TODO (Milestone 3):
- *
- * Helper — getCurrentUser():
- *   - SecurityContextHolder.getContext().getAuthentication().getPrincipal()
- *   - Cast to your User class (which implements UserDetails)
- *
- * createTransaction():
- *   1. Get authenticated user via getCurrentUser()
- *   2. Fetch Category by id — throw ResourceNotFoundException if missing
- *   3. Verify category belongs to user (or is a default category)
- *   4. Build Transaction entity from request + user + category
- *   5. Save and return mapped DTO
- *
- * getAllTransactions():
- *   1. Build dynamic query based on filters (type, month, categoryId)
- *   2. Use Pageable for pagination
- *   3. Map Page<Transaction> → Page<TransactionResponse> with mapper
- *
- * updateTransaction():
- *   1. Fetch transaction — throw ResourceNotFoundException if missing
- *   2. Verify ownership — throw AccessDeniedException if not owner
- *   3. Update only the provided fields
- *   4. Save and return DTO
- */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -59,28 +31,22 @@ public class TransactionServiceImpl implements TransactionService {
     private final CategoryRepository categoryRepository;
     private final UserRepository userRepository;
 
-    private User getCurrentUser(){
+    private User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        User user = userRepository.findByEmail(authentication.getName()).orElseThrow();
-        return user;
+        return userRepository.findByEmail(authentication.getName()).orElseThrow();
     }
 
     @Override
     public TransactionResponse createTransaction(TransactionRequest request) {
-        User user  = getCurrentUser();
+        User user = getCurrentUser();
 
-        Category category = categoryRepository.findById(request.getCategoryId()).orElseThrow();
+        Category category = categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId()));
 
-        List<Category> categories = categoryRepository.findAllByUserId(user.getId());
-        boolean found = false;
-        for(Category category1 : categories){
-            if(category1.getId().equals(category.getId())){
-                found = true;
-                break;
-            }
-        }
+        boolean isUserCategory = category.getUser() != null && category.getUser().getId().equals(user.getId());
+        boolean isDefaultCategory = Boolean.TRUE.equals(category.getIsDefault());
 
-        if(!found){
+        if (!isUserCategory && !isDefaultCategory) {
             throw new ResourceNotFoundException("Category not found for the user.");
         }
 
@@ -96,14 +62,7 @@ public class TransactionServiceImpl implements TransactionService {
 
         Transaction savedTransaction = transactionRepository.save(transaction);
 
-        return TransactionResponse.builder()
-                .id(transaction.getId())
-                .description(transaction.getDescription())
-                .amount(transaction.getAmount())
-                .transactionType(transaction.getTransactionType())
-                .date(transaction.getDate())
-                .note(transaction.getNote())
-                .build();
+        return buildResponse(savedTransaction);
     }
 
     @Override
@@ -111,12 +70,76 @@ public class TransactionServiceImpl implements TransactionService {
     public TransactionResponse getTransactionById(Long id) {
         User user = getCurrentUser();
 
-        Transaction transaction = transactionRepository.findById(id).orElseThrow();
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Transaction", "id", id));
 
-        if(!transaction.getUser().getId().equals(user.getId())){
-            throw new ResourceNotFoundException("Transaction not found.");
+        if (!transaction.getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Access denied: Transaction doesn't belong to this user.");
         }
 
+        return buildResponse(transaction);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<TransactionResponse> getAllTransactions(TransactionType type, String month, Long categoryId, Pageable pageable) {
+        User user = getCurrentUser();
+        Page<Transaction> transactions;
+
+        if (categoryId != null) {
+            transactions = transactionRepository.findAllByUserIdAndCategoryId(user.getId(), categoryId, pageable);
+        } else if (month != null && !month.isBlank()) {
+            YearMonth yearMonth = YearMonth.parse(month);
+            LocalDateTime startDate = yearMonth.atDay(1).atStartOfDay();
+            LocalDateTime endDate = yearMonth.atEndOfMonth().atTime(23, 59, 59);
+            transactions = transactionRepository.findAllByUserIdAndDateBetween(user.getId(), startDate, endDate, pageable);
+        } else if (type != null) {
+            transactions = transactionRepository.findAllByUserIdAndTransactionType(user.getId(), type, pageable);
+        } else {
+            transactions = transactionRepository.findAllByUserId(user.getId(), pageable);
+        }
+
+        return transactions.map(this::buildResponse);
+    }
+
+    @Override
+    public TransactionResponse updateTransaction(Long id, TransactionRequest request) {
+        User user = getCurrentUser();
+
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Transaction", "id", id));
+                
+        if (!transaction.getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Access denied: Transaction doesn't belong to this user.");
+        }
+
+        transaction.setTransactionType(request.getTransactionType());
+        transaction.setAmount(request.getAmount());
+        transaction.setDescription(request.getDescription());
+        transaction.setNote(request.getNote());
+        transaction.setCategory(categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category", "id", request.getCategoryId())));
+
+        Transaction savedTransaction = transactionRepository.save(transaction);
+
+        return buildResponse(savedTransaction);
+    }
+
+    @Override
+    public void deleteTransaction(Long id) {
+        User user = getCurrentUser();
+
+        Transaction transaction = transactionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Transaction", "id", id));
+
+        if (!transaction.getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("Access denied: Transaction doesn't belong to this user.");
+        }
+
+        transactionRepository.deleteById(id);
+    }
+
+    private TransactionResponse buildResponse(Transaction transaction) {
         return TransactionResponse.builder()
                 .id(transaction.getId())
                 .description(transaction.getDescription())
@@ -129,85 +152,5 @@ public class TransactionServiceImpl implements TransactionService {
                 .categoryIcon(transaction.getCategory().getIcon())
                 .createdAt(transaction.getCreatedAt())
                 .build();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<TransactionResponse> getAllTransactions(TransactionType type, String month, Long categoryId, Pageable pageable) {
-        User user = getCurrentUser();
-        Page<Transaction> transactions;
-
-        if(categoryId != null){
-            transactions = transactionRepository.findAllByUserIdAndCategoryId(user.getId(), categoryId, pageable);
-        }
-        else if(type != null){
-            transactions = transactionRepository.findAllByUserIdAndTransactionType(user.getId(), type, pageable);
-        }
-        else {
-            transactions = transactionRepository.findAllByUserId(user.getId(), pageable);
-        }
-
-        return transactions.map(transaction ->
-                TransactionResponse.builder()
-                        .id(transaction.getId())
-                        .description(transaction.getDescription())
-                        .amount(transaction.getAmount())
-                        .transactionType(transaction.getTransactionType())
-                        .date(transaction.getDate())
-                        .note(transaction.getNote())
-                        .categoryId(transaction.getCategory().getId())
-                        .categoryName(transaction.getCategory().getName())
-                        .categoryIcon(transaction.getCategory().getIcon())
-                        .createdAt(transaction.getCreatedAt())
-                        .build()
-        );
-    }
-
-    @Override
-    public TransactionResponse updateTransaction(Long id, TransactionRequest request) throws AccessDeniedException {
-        User user = getCurrentUser();
-
-
-        Transaction transaction = transactionRepository.findById(id).orElseThrow();
-        if(!transaction.getUser().getId().equals(user.getId())){
-            throw new AccessDeniedException(
-                    "No transaction found for the user."
-            );
-        }
-
-        transaction.setTransactionType(request.getTransactionType());
-        transaction.setAmount(request.getAmount());
-        transaction.setDescription(request.getDescription());
-        transaction.setNote(request.getNote());
-        transaction.setCategory(categoryRepository.findById(request.getCategoryId()).orElseThrow());
-
-        Transaction savedTransaction = transactionRepository.save(transaction);
-
-        return TransactionResponse.builder()
-                .id(savedTransaction.getId())
-                .description(savedTransaction.getDescription())
-                .amount(request.getAmount())
-                .transactionType(savedTransaction.getTransactionType())
-                .date(savedTransaction.getDate())
-                .note(savedTransaction.getNote())
-                .categoryId(savedTransaction.getCategory().getId())
-                .categoryName(savedTransaction.getCategory().getName())
-                .categoryIcon(savedTransaction.getCategory().getIcon())
-                .createdAt(savedTransaction.getCreatedAt())
-                .build();
-
-    }
-
-    @Override
-    public void deleteTransaction(Long id) throws AccessDeniedException {
-        User user = getCurrentUser();
-
-        Transaction transaction = transactionRepository.findById(id).orElseThrow();
-
-        if(!transaction.getUser().getId().equals(user.getId())){
-            throw new AccessDeniedException("No transaction found for the user.");
-        }
-
-        transactionRepository.deleteById(id);
     }
 }

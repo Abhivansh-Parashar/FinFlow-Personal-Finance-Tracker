@@ -1,11 +1,12 @@
-import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Wallet, Eye, EyeOff, ArrowRight, Check } from 'lucide-react'
-import { authService, getAuthPayload } from '../services/api'
+import { authService, getAuthPayload, getGoogleAuthUrl } from '../services/api'
 
 export default function Register() {
   const { login } = useAuth()
+  const location = useLocation()
   const navigate = useNavigate()
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' })
   const [showPw, setShowPw] = useState(false)
@@ -17,6 +18,25 @@ export default function Register() {
     { label: 'Contains number', ok: /\d/.test(form.password) },
     { label: 'Passwords match', ok: form.password && form.password === form.confirm },
   ]
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const token = params.get('token')
+
+    if (!token) {
+      return
+    }
+
+    const userId = params.get('userId')
+    const user = {
+      id: userId ? Number(userId) : null,
+      name: params.get('name') || '',
+      email: params.get('email') || '',
+    }
+
+    login(user, token)
+    navigate('/dashboard', { replace: true })
+  }, [location.search, login, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -42,6 +62,10 @@ export default function Register() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleGoogleLogin = () => {
+    window.location.assign(getGoogleAuthUrl())
   }
 
   return (
@@ -74,6 +98,22 @@ export default function Register() {
           <div style={{ marginBottom: 28 }}>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '1.6rem', fontWeight: 800, marginBottom: 6 }}>Create account</h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>Free forever. No credit card required.</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="btn btn-secondary"
+            style={{ width: '100%', justifyContent: 'center', padding: '12px', marginBottom: 16 }}
+          >
+            <span style={{ display: 'inline-flex', width: 18, height: 18, alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: '#fff', color: '#111', fontWeight: 800, fontSize: '0.8rem' }}>G</span>
+            Continue with Google
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>or</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
           </div>
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

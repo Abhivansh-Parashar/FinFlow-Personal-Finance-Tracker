@@ -1,16 +1,41 @@
-import React, { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Wallet, Eye, EyeOff, ArrowRight } from 'lucide-react'
-import { authService, getAuthPayload } from '../services/api'
+import { authService, getAuthPayload, getGoogleAuthUrl } from '../services/api'
 
 export default function Login() {
   const { login } = useAuth()
+  const location = useLocation()
   const navigate = useNavigate()
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const token = params.get('token')
+    const oauthError = params.get('error')
+
+    if (token) {
+      const userId = params.get('userId')
+      const user = {
+        id: userId ? Number(userId) : null,
+        name: params.get('name') || '',
+        email: params.get('email') || '',
+      }
+
+      login(user, token)
+      navigate('/dashboard', { replace: true })
+      return
+    }
+
+    if (oauthError) {
+      setError(oauthError)
+      navigate('/login', { replace: true })
+    }
+  }, [location.search, login, navigate])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -31,6 +56,10 @@ export default function Login() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleGoogleLogin = () => {
+    window.location.assign(getGoogleAuthUrl())
   }
 
   return (
@@ -60,6 +89,23 @@ export default function Login() {
 
           {/* Removed demo credentials hint — use real credentials or register */}
 
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="btn btn-secondary"
+            style={{ width: '100%', justifyContent: 'center', padding: '12px', marginBottom: 16 }}
+          >
+            <span style={{ display: 'inline-flex', width: 18, height: 18, alignItems: 'center', justifyContent: 'center', borderRadius: '50%', background: '#fff', color: '#111', fontWeight: 800, fontSize: '0.8rem' }}>G</span>
+            Continue with Google
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>or</span>
+            <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+          </div>
+
+
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="form-group">
               <label className="form-label">Email Address</label>
@@ -79,11 +125,13 @@ export default function Login() {
               </div>
             </div>
 
-            {error && <div style={{ color: 'var(--accent-red)', fontSize: '0.82rem', background: 'var(--accent-red-dim)', padding: '8px 12px', borderRadius: 8 }}>{error}</div>}
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <span className="tooltip" data-tip="Coming soon" style={{ fontSize: '0.8rem', color: 'var(--accent-green)', cursor: 'not-allowed', opacity: 0.7 }}>Forgot password?</span>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -6 }}>
+              <Link to="/forgot-password" style={{ fontSize: '0.8rem', color: 'var(--accent-green)' }}>
+                Forgot password?
+              </Link>
             </div>
+
+            {error && <div style={{ color: 'var(--accent-red)', fontSize: '0.82rem', background: 'var(--accent-red-dim)', padding: '8px 12px', borderRadius: 8 }}>{error}</div>}
 
             <button type="submit" className="btn btn-primary" style={{ padding: '12px', justifyContent: 'center', fontSize: '0.95rem', marginTop: 4 }} disabled={loading}>
               {loading ? 'Signing in...' : <><span>Sign In</span><ArrowRight size={15} /></>}
