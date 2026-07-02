@@ -100,7 +100,7 @@ export const authService = {
   login:    (data) => api.post('/auth/login', data),
 }
 
-export const getGoogleAuthUrl = () => `${API_BASE_URL}/auth/google`
+export const getGoogleAuthUrl = () => "http://localhost:8080/oauth2/authorization/google";
 
 // ── Transaction Service ──────────────────────────────────────────────────────
 export const transactionService = {

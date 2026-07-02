@@ -1,5 +1,6 @@
 package com.financetracker.entity;
 
+import com.financetracker.enums.AuthProvider;
 import com.financetracker.enums.Role;
 import jakarta.persistence.*;
 import lombok.*;
@@ -49,6 +50,10 @@ public class User implements UserDetails {
     private List<Budget> budgets;
     @OneToMany(mappedBy = "user")
     private List<Category> categories;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private AuthProvider authProvider = AuthProvider.LOCAL;
 
 
     @PrePersist
