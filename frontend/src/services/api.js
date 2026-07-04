@@ -94,6 +94,163 @@ export const normaliseTransaction = (t) => ({
   amount: Number(t.amount ?? 0),
 })
 
+const NOTIFICATION_STORAGE_KEY = 'finflow.notifications'
+const NOTIFICATION_SETTINGS_KEY = 'finflow.notification-settings'
+
+export const DEFAULT_NOTIFICATION_SETTINGS = {
+  budgetAlerts: true,
+  txnReminders: true,
+  monthlySummary: true,
+  largeTxnAlert: true,
+  weeklyReport: false,
+}
+
+const readStoredNotifications = () => {
+  try {
+    const raw = localStorage.getItem(NOTIFICATION_STORAGE_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+const writeStoredNotifications = (notifications) => {
+  localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications))
+}
+
+export const formatNotificationTime = (timestamp) => {
+  if (!timestamp) return ''
+
+  const diffMs = Date.now() - new Date(timestamp).getTime()
+  const diffMinutes = Math.max(1, Math.floor(diffMs / 60000))
+
+  if (diffMinutes < 60) return `${diffMinutes}m ago`
+
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+
+  const diffDays = Math.floor(diffHours / 24)
+  return `${diffDays}d ago`
+}
+
+const readStoredJson = (key, fallback) => {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return fallback
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : fallback
+  } catch {
+    return fallback
+  }
+}
+
+export const buildTransactionNotification = (transaction) => {
+  const type = (transaction?.type ?? transaction?.transactionType ?? 'EXPENSE').toUpperCase()
+  const amount = Number(transaction?.amount ?? 0)
+  const description = transaction?.description?.trim() || 'Transaction'
+  const category = transaction?.categoryName?.trim()
+  const amountLabel = `₹${amount.toLocaleString('en-IN')}`
+
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    type,
+    title: `${type === 'INCOME' ? 'Income' : 'Expense'} added`,
+    body: category
+      ? `${description} in ${category} for ${amountLabel}`
+      : `${description} for ${amountLabel}`,
+    createdAt: new Date().toISOString(),
+    read: false,
+  }
+}
+
+export const getNotificationSettings = () => ({
+  ...DEFAULT_NOTIFICATION_SETTINGS,
+  ...readStoredJson(NOTIFICATION_SETTINGS_KEY, {}),
+})
+
+export const setNotificationSettings = (settings) => {
+  const next = {
+    ...DEFAULT_NOTIFICATION_SETTINGS,
+    ...settings,
+  }
+  localStorage.setItem(NOTIFICATION_SETTINGS_KEY, JSON.stringify(next))
+  return next
+}
+
+export const addTransactionNotification = (transaction, options = {}) => {
+  const settings = options.settings ?? getNotificationSettings()
+  const amount = Number(transaction?.amount ?? 0)
+  const monthlyBudget = Number(options.monthlyBudget ?? 0)
+  const notifications = []
+
+  if (settings.txnReminders !== false) {
+    notifications.push(buildTransactionNotification(transaction))
+  }
+
+  if (settings.largeTxnAlert && amount >= 10000) {
+    notifications.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-large`,
+      type: 'ALERT',
+      title: 'Large transaction alert',
+      body: `A ₹${amount.toLocaleString('en-IN')} transaction was added.`,
+      createdAt: new Date().toISOString(),
+      read: false,
+    })
+  }
+
+  if (settings.budgetAlerts && monthlyBudget > 0 && transaction?.type === 'EXPENSE') {
+    const usage = amount / monthlyBudget
+    if (usage >= 0.9) {
+      notifications.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-budget`,
+        type: 'BUDGET',
+        title: usage >= 1 ? 'Budget exceeded' : 'Budget alert',
+        body: usage >= 1
+          ? `This expense pushed you over your monthly budget of ₹${monthlyBudget.toLocaleString('en-IN')}.`
+          : `This expense used ${Math.round(usage * 100)}% of your monthly budget.`,
+        createdAt: new Date().toISOString(),
+        read: false,
+      })
+    }
+  }
+
+  if (settings.monthlySummary) {
+    notifications.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-summary`,
+      type: 'SUMMARY',
+      title: 'Monthly summary updated',
+      body: 'Your summary view has been refreshed with the latest transaction.',
+      createdAt: new Date().toISOString(),
+      read: false,
+    })
+  }
+
+  if (settings.weeklyReport) {
+    notifications.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-weekly`,
+      type: 'REPORT',
+      title: 'Weekly report updated',
+      body: 'Your weekly insights have been updated with this transaction.',
+      createdAt: new Date().toISOString(),
+      read: false,
+    })
+  }
+
+  if (notifications.length === 0) return []
+
+  const merged = [...notifications, ...readStoredNotifications()].slice(0, 10)
+  writeStoredNotifications(merged)
+  window.dispatchEvent(new CustomEvent('transactions:notifications-updated', { detail: merged }))
+  return notifications
+}
+
+export const getStoredNotifications = () => readStoredNotifications()
+export const setStoredNotifications = (notifications) => {
+  writeStoredNotifications(notifications)
+  window.dispatchEvent(new CustomEvent('transactions:notifications-updated', { detail: notifications }))
+}
+
 // ── Auth Service ─────────────────────────────────────────────────────────────
 export const authService = {
   register: (data) => api.post('/auth/register', data),

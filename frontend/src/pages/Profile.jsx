@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { userService, getApiPayload } from '../services/api'
-import { User, Mail, Phone, Edit2, Save, Shield, Bell, Palette, LogOut, CheckCircle } from 'lucide-react'
+import { userService, getApiPayload, getNotificationSettings, setNotificationSettings } from '../services/api'
+import { Edit2, Save, Shield, LogOut, CheckCircle } from 'lucide-react'
 
 export default function Profile() {
   const { user, setUser, logout } = useAuth()
@@ -9,8 +9,6 @@ export default function Profile() {
   const [saving, setSaving]     = useState(false)
   const [saveOk, setSaveOk]     = useState(false)
   const [error, setError]       = useState('')
-  const [activeSection, setActiveSection] = useState('personal')
-
   const [form, setForm] = useState({
     name:          user?.name          ?? '',
     email:         user?.email         ?? '',
@@ -42,13 +40,23 @@ export default function Profile() {
   const [pwSuccess, setPwSuccess] = useState(false)
 
   // Notification toggles
-  const [notifs, setNotifs] = useState([
-    { key: 'budgetAlerts',      label: 'Budget Alerts',           desc: "Get notified when you're close to your budget limit", enabled: true },
-    { key: 'txnReminders',      label: 'Transaction Reminders',   desc: 'Reminders to log daily transactions', enabled: false },
-    { key: 'monthlySummary',    label: 'Monthly Summary Email',   desc: 'Receive monthly financial summary via email', enabled: true },
-    { key: 'largeTxnAlert',     label: 'Large Transaction Alert', desc: 'Alert for transactions above ₹10,000', enabled: true },
-    { key: 'weeklyReport',      label: 'Weekly Report',           desc: 'Weekly spending insights every Monday', enabled: false },
-  ])
+  const [notifs, setNotifs] = useState(() => {
+    const settings = getNotificationSettings()
+    return [
+      { key: 'budgetAlerts',      label: 'Budget Alerts',           desc: "Get notified when you're close to your budget limit", enabled: settings.budgetAlerts },
+      { key: 'txnReminders',      label: 'Transaction Reminders',   desc: 'Show a notification whenever you add a transaction', enabled: settings.txnReminders },
+      { key: 'monthlySummary',    label: 'Monthly Summary',         desc: 'Show a monthly summary update in the app', enabled: settings.monthlySummary },
+      { key: 'largeTxnAlert',     label: 'Large Transaction Alert', desc: 'Alert for transactions above ₹10,000', enabled: settings.largeTxnAlert },
+      { key: 'weeklyReport',      label: 'Weekly Report',           desc: 'Show weekly report updates in the app', enabled: settings.weeklyReport },
+    ]
+  })
+
+  useEffect(() => {
+    setNotificationSettings(notifs.reduce((acc, item) => {
+      acc[item.key] = item.enabled
+      return acc
+    }, {}))
+  }, [notifs])
 
   const initials = user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'
 
@@ -131,136 +139,97 @@ export default function Profile() {
             </div>
 
             <div className="card" style={{ padding: '8px' }}>
-              {[
-                { id: 'personal',      icon: User,    label: 'Personal Info' },
-                { id: 'preferences',   icon: Palette, label: 'Preferences' },
-                { id: 'security',      icon: Shield,  label: 'Security' },
-                { id: 'notifications', icon: Bell,    label: 'Notifications' },
-              ].map(s => (
-                  <button key={s.id} onClick={() => setActiveSection(s.id)} className="btn" style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 14px', gap: 10, background: activeSection === s.id ? 'var(--accent-green-dim)' : 'transparent', color: activeSection === s.id ? 'var(--accent-green)' : 'var(--text-secondary)', fontWeight: activeSection === s.id ? 600 : 400, marginBottom: 2 }}>
-                    <s.icon size={15} strokeWidth={1.8} />
-                    {s.label}
-                  </button>
-              ))}
-              <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8 }}>
-                <button className="btn btn-danger" style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 14px', gap: 10 }} onClick={logout}>
-                  <LogOut size={15} /> Sign Out
-                </button>
-              </div>
+              <button className="btn btn-danger" style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 14px', gap: 10 }} onClick={logout}>
+                <LogOut size={15} /> Sign Out
+              </button>
             </div>
           </div>
 
           {/* Right panel */}
           <div>
-            {activeSection === 'personal' && (
-                <div className="card fade-in">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem' }}>Personal Information</div>
-                    {editing
-                        ? <button className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={handleSave} disabled={saving}>
-                          <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
-                        </button>
-                        : <button className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={() => setEditing(true)}>
-                          <Edit2 size={14} /> Edit
-                        </button>
-                    }
-                  </div>
-
-                  <div className="grid-2" style={{ gap: 18 }}>
-                    {[
-                      { label: 'Full Name',    key: 'name',   type: 'text',   placeholder: 'Your full name' },
-                      { label: 'Email',        key: 'email',  type: 'email',  placeholder: 'your@email.com', disabled: true },
-                      { label: 'Phone',        key: 'phone',  type: 'tel',    placeholder: '+91 xxxxx xxxxx' },
-                      { label: 'Monthly Budget (₹)', key: 'monthlyBudget', type: 'number', placeholder: '50000' },
-                    ].map(field => (
-                        <div key={field.key} className="form-group">
-                          <label className="form-label">{field.label}</label>
-                          <input type={field.type} className="form-input"
-                                 value={form[field.key] || ''}
-                                 onChange={e => setForm({ ...form, [field.key]: e.target.value })}
-                                 disabled={!editing || field.disabled}
-                                 placeholder={field.placeholder}
-                                 style={{ opacity: (editing && !field.disabled) ? 1 : 0.6 }}
-                          />
-                        </div>
-                    ))}
-                    <div className="form-group">
-                      <label className="form-label">Currency</label>
-                      <select className="form-input" value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} disabled={!editing} style={{ opacity: editing ? 1 : 0.6 }}>
-                        <option value="₹">₹ Indian Rupee (INR)</option>
-                        <option value="$">$ US Dollar (USD)</option>
-                        <option value="€">€ Euro (EUR)</option>
-                        <option value="£">£ British Pound (GBP)</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-            )}
-
-            {activeSection === 'preferences' && (
-                <div className="card fade-in">
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 24 }}>Preferences</div>
-                  {[
-                    { label: 'Default Currency', value: `${form.currency} (${form.currency === '₹' ? 'INR' : form.currency === '$' ? 'USD' : 'Other'})` },
-                    { label: 'Date Format',      value: 'DD/MM/YYYY' },
-                    { label: 'Theme',            value: 'Dark' },
-                    { label: 'Language',         value: 'English' },
-                    { label: 'Financial Year',   value: 'April – March' },
-                  ].map(pref => (
-                      <div key={pref.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{pref.label}</span>
-                        <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{pref.value}</span>
-                      </div>
-                  ))}
-                </div>
-            )}
-
-            {activeSection === 'security' && (
-                <div className="card fade-in">
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 24 }}>Security Settings</div>
-                  {pwError && <div style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: '0.85rem' }}>{pwError}</div>}
-                  {pwSuccess && <div style={{ background: 'var(--accent-green-dim)', color: 'var(--accent-green)', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: '0.85rem' }}>Password changed successfully!</div>}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                    <div className="form-group">
-                      <label className="form-label">Current Password</label>
-                      <input type="password" className="form-input" placeholder="Enter current password"
-                             value={pwForm.oldPassword} onChange={e => setPwForm({ ...pwForm, oldPassword: e.target.value })} />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">New Password</label>
-                      <input type="password" className="form-input" placeholder="Enter new password"
-                             value={pwForm.newPassword} onChange={e => setPwForm({ ...pwForm, newPassword: e.target.value })} />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Confirm New Password</label>
-                      <input type="password" className="form-input" placeholder="Confirm new password"
-                             value={pwForm.confirm} onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })} />
-                    </div>
-                    {/* FIX: Button now actually calls changePassword */}
-                    <button className="btn btn-primary" style={{ width: 'fit-content' }} onClick={handlePasswordChange} disabled={pwSaving}>
-                      <Shield size={14} /> {pwSaving ? 'Updating...' : 'Update Password'}
+            <div className="card fade-in" style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem' }}>Personal Information</div>
+                {editing
+                    ? <button className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={handleSave} disabled={saving}>
+                      <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
                     </button>
-                  </div>
-                </div>
-            )}
+                    : <button className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={() => setEditing(true)}>
+                      <Edit2 size={14} /> Edit
+                    </button>
+                }
+              </div>
 
-            {activeSection === 'notifications' && (
-                <div className="card fade-in">
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 24 }}>Notification Settings</div>
-                  {notifs.map(notif => (
-                      <div key={notif.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
-                        <div>
-                          <div style={{ fontWeight: 500, fontSize: '0.875rem', marginBottom: 2 }}>{notif.label}</div>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{notif.desc}</div>
-                        </div>
-                        {/* FIX: toggles are now interactive */}
-                        <div onClick={() => toggleNotif(notif.key)} style={{ width: 40, height: 22, borderRadius: 100, background: notif.enabled ? 'var(--accent-green)' : 'var(--bg-secondary)', border: `1px solid ${notif.enabled ? 'var(--accent-green)' : 'var(--border)'}`, position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'var(--transition)' }}>
-                          <div style={{ position: 'absolute', top: 2, left: notif.enabled ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: notif.enabled ? '#000' : 'var(--text-muted)', transition: 'left 0.2s ease' }} />
-                        </div>
-                      </div>
-                  ))}
+              <div className="grid-2" style={{ gap: 18 }}>
+                {[
+                  { label: 'Full Name',    key: 'name',   type: 'text',   placeholder: 'Your full name' },
+                  { label: 'Email',        key: 'email',  type: 'email',  placeholder: 'your@email.com', disabled: true },
+                  { label: 'Phone',        key: 'phone',  type: 'tel',    placeholder: '+91 xxxxx xxxxx' },
+                  { label: 'Monthly Budget (₹)', key: 'monthlyBudget', type: 'number', placeholder: '50000' },
+                ].map(field => (
+                    <div key={field.key} className="form-group">
+                      <label className="form-label">{field.label}</label>
+                      <input type={field.type} className="form-input"
+                             value={form[field.key] || ''}
+                             onChange={e => setForm({ ...form, [field.key]: e.target.value })}
+                             disabled={!editing || field.disabled}
+                             placeholder={field.placeholder}
+                             style={{ opacity: (editing && !field.disabled) ? 1 : 0.6 }}
+                      />
+                    </div>
+                ))}
+                <div className="form-group">
+                  <label className="form-label">Currency</label>
+                  <select className="form-input" value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} disabled={!editing} style={{ opacity: editing ? 1 : 0.6 }}>
+                    <option value="₹">₹ Indian Rupee (INR)</option>
+                    <option value="$">$ US Dollar (USD)</option>
+                    <option value="€">€ Euro (EUR)</option>
+                    <option value="£">£ British Pound (GBP)</option>
+                  </select>
                 </div>
-            )}
+              </div>
+            </div>
+
+            <div className="card fade-in" style={{ marginBottom: 20 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 24 }}>Security Settings</div>
+              {pwError && <div style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: '0.85rem' }}>{pwError}</div>}
+              {pwSuccess && <div style={{ background: 'var(--accent-green-dim)', color: 'var(--accent-green)', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: '0.85rem' }}>Password changed successfully!</div>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className="form-group">
+                  <label className="form-label">Current Password</label>
+                  <input type="password" className="form-input" placeholder="Enter current password"
+                         value={pwForm.oldPassword} onChange={e => setPwForm({ ...pwForm, oldPassword: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">New Password</label>
+                  <input type="password" className="form-input" placeholder="Enter new password"
+                         value={pwForm.newPassword} onChange={e => setPwForm({ ...pwForm, newPassword: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Confirm New Password</label>
+                  <input type="password" className="form-input" placeholder="Confirm new password"
+                         value={pwForm.confirm} onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })} />
+                </div>
+                <button className="btn btn-primary" style={{ width: 'fit-content' }} onClick={handlePasswordChange} disabled={pwSaving}>
+                  <Shield size={14} /> {pwSaving ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </div>
+
+            <div className="card fade-in">
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 24 }}>Notification Settings</div>
+              {notifs.map(notif => (
+                  <div key={notif.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div>
+                      <div style={{ fontWeight: 500, fontSize: '0.875rem', marginBottom: 2 }}>{notif.label}</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{notif.desc}</div>
+                    </div>
+                    <div onClick={() => toggleNotif(notif.key)} style={{ width: 40, height: 22, borderRadius: 100, background: notif.enabled ? 'var(--accent-green)' : 'var(--bg-secondary)', border: `1px solid ${notif.enabled ? 'var(--accent-green)' : 'var(--border)'}`, position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'var(--transition)' }}>
+                      <div style={{ position: 'absolute', top: 2, left: notif.enabled ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: notif.enabled ? '#000' : 'var(--text-muted)', transition: 'left 0.2s ease' }} />
+                    </div>
+                  </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

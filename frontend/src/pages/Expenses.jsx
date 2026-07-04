@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { TrendingDown, Plus, X, ArrowDownLeft } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
-import { transactionService, reportService, categoryService, getApiList, normaliseTransaction } from '../services/api'
+import { transactionService, reportService, categoryService, getApiList, normaliseTransaction, addTransactionNotification } from '../services/api'
 import TransactionRow from '../components/common/TransactionRow'
 import StatCard from '../components/common/StatCard'
+import { useAuth } from '../context/AuthContext'
 
 export default function Expenses() {
+  const { user } = useAuth()
   const [expenseTransactions, setExpenseTransactions] = useState([])
   const [categories, setCategories] = useState([])
   const [monthlySummary, setMonthlySummary]   = useState([])
@@ -61,6 +63,12 @@ export default function Expenses() {
         date: form.date,
         note: form.note,
       })
+      addTransactionNotification({
+        type: 'EXPENSE',
+        categoryName: expenseCategories.find(c => String(c.id) === String(form.categoryId))?.name,
+        description: form.description,
+        amount: Number(form.amount),
+      }, { monthlyBudget: user?.monthlyBudget })
       await fetchData()
       setShowModal(false)
       setForm({ categoryId: '', amount: '', description: '', date: new Date().toISOString().split('T')[0], note: '' })

@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Plus, Search, X, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import TransactionRow from '../components/common/TransactionRow'
-import { transactionService, categoryService, getApiList, getPageMeta, normaliseTransaction } from '../services/api'
+import { transactionService, categoryService, getApiList, getPageMeta, normaliseTransaction, addTransactionNotification } from '../services/api'
+import { useAuth } from '../context/AuthContext'
 
 const EMPTY_FORM = {
   type: 'EXPENSE', categoryId: '', amount: '', description: '',
@@ -10,6 +11,7 @@ const EMPTY_FORM = {
 }
 
 export default function Transactions() {
+  const { user } = useAuth()
   const { searchTerm = '' } = useOutletContext() || {}
   const [transactions, setTransactions] = useState([])
   const [categories, setCategories]     = useState([])
@@ -102,11 +104,13 @@ export default function Transactions() {
         description:     form.description,
         date:            form.date,
         note:            form.note,
+        categoryName:    relevantCategories.find(c => String(c.id) === String(form.categoryId))?.name,
       }
       if (editTarget) {
         await transactionService.update(editTarget.id, payload)
       } else {
         await transactionService.create(payload)
+        addTransactionNotification(payload, { monthlyBudget: user?.monthlyBudget })
       }
       await fetchTransactions()
       setShowModal(false)

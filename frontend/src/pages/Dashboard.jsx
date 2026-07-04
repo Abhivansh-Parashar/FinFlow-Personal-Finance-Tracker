@@ -36,6 +36,8 @@ const CustomPieTooltip = ({ active, payload }) => {
   )
 }
 
+const PIE_COLORS = ['#00c896', '#4d9fff', '#ffb74d', '#a78bfa', '#ff5c7a', '#34d399']
+
 export default function Dashboard() {
   const { user } = useAuth()
   const [recentTxns, setRecentTxns]         = useState([])
@@ -71,7 +73,7 @@ export default function Dashboard() {
         setCategoryBreakdown(getApiList(breakdownRes).map((item, i) => ({
           name:  item.categoryName ?? item.name ?? 'Other',
           value: Number(item.totalAmount ?? item.value ?? 0),
-          color: item.color ?? '#a78bfa',
+          color: item.color ?? PIE_COLORS[i % PIE_COLORS.length],
         })))
 
         // FIX: compute real budget used for the stat card

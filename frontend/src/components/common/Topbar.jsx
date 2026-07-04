@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { Bell, Search, X, TrendingUp, TrendingDown, Target } from 'lucide-react'
+import { formatNotificationTime, getStoredNotifications, setStoredNotifications } from '../../services/api'
 
 const PAGE_TITLES = {
   '/dashboard':    { title: 'Dashboard',    subtitle: "Welcome back! Here's your financial overview." },
@@ -13,34 +14,32 @@ const PAGE_TITLES = {
   '/profile':      { title: 'Profile',      subtitle: 'Manage your account settings.' },
 }
 
-// Static demo notifications — replace with a real API call when you build the notifications backend
-const DEMO_NOTIFICATIONS = [
-  { id: 1, icon: Target,      color: 'var(--accent-red)',   title: 'Budget Alert',        body: 'Shopping budget is 90% used this month.',     time: '2m ago',  read: false },
-  { id: 2, icon: TrendingDown, color: 'var(--accent-amber)', title: 'Large Expense',       body: '₹15,000 rent payment recorded.',               time: '1h ago',  read: false },
-  { id: 3, icon: TrendingUp,   color: 'var(--accent-green)', title: 'Income Added',        body: 'Salary of ₹75,000 added for this month.',      time: '3h ago',  read: true  },
-  { id: 4, icon: Target,       color: 'var(--accent-blue)',  title: 'Monthly Summary',     body: "June summary is ready. You saved 45% this month!", time: '1d ago', read: true },
-]
-
 export default function Topbar({ sidebarWidth = 240, onSearch }) {
   const { pathname } = useLocation()
-  const navigate = useNavigate()
   const info = PAGE_TITLES[pathname] || { title: 'FinFlow', subtitle: '' }
+  const isTransactionsPage = pathname === '/transactions'
 
   const [searchVal, setSearchVal]       = useState('')
   const [showNotifs, setShowNotifs]     = useState(false)
-  const [notifications, setNotifications] = useState(DEMO_NOTIFICATIONS)
+  const [notifications, setNotifications] = useState(() => getStoredNotifications())
   const debounceRef  = useRef(null)
   const notifPanelRef = useRef(null)
 
   const unreadCount = notifications.filter(n => !n.read).length
 
-  // Debounced search
+  // Debounced search on the transactions page only
   useEffect(() => {
-    if (!onSearch) return
+    if (!isTransactionsPage || !onSearch) return
     clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => onSearch(searchVal), 300)
     return () => clearTimeout(debounceRef.current)
-  }, [searchVal, onSearch])
+  }, [isTransactionsPage, searchVal, onSearch])
+
+  useEffect(() => {
+    if (isTransactionsPage) return
+    if (searchVal !== '') setSearchVal('')
+    if (onSearch) onSearch('')
+  }, [isTransactionsPage, onSearch])
 
   // Close notification panel when clicking outside
   useEffect(() => {
@@ -53,9 +52,38 @@ export default function Topbar({ sidebarWidth = 240, onSearch }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [showNotifs])
 
-  const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-  const markRead = (id) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-  const dismiss  = (id) => setNotifications(prev => prev.filter(n => n.id !== id))
+  useEffect(() => {
+    const handleNotificationsUpdated = (event) => {
+      const next = event?.detail
+      setNotifications(Array.isArray(next) ? next : getStoredNotifications())
+    }
+
+    window.addEventListener('transactions:notifications-updated', handleNotificationsUpdated)
+    window.addEventListener('storage', handleNotificationsUpdated)
+    return () => {
+      window.removeEventListener('transactions:notifications-updated', handleNotificationsUpdated)
+      window.removeEventListener('storage', handleNotificationsUpdated)
+    }
+  }, [])
+
+  const updateNotifications = (updater) => {
+    setNotifications(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      setStoredNotifications(next)
+      return next
+    })
+  }
+
+  const markAllRead = () => updateNotifications(prev => prev.map(n => ({ ...n, read: true })))
+  const markRead = (id) => updateNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+  const dismiss  = (id) => updateNotifications(prev => prev.filter(n => n.id !== id))
+  const getNotifVisual = (type) => {
+    if (type === 'INCOME') return { icon: TrendingUp, color: 'var(--accent-green)', background: 'var(--accent-green-dim)' }
+    if (type === 'EXPENSE') return { icon: TrendingDown, color: 'var(--accent-red)', background: 'var(--accent-red-dim)' }
+    if (type === 'BUDGET') return { icon: Target, color: 'var(--accent-amber)', background: 'var(--accent-amber-dim)' }
+    if (type === 'SUMMARY') return { icon: Bell, color: 'var(--accent-blue)', background: 'var(--accent-blue-dim)' }
+    return { icon: Bell, color: 'var(--accent-blue)', background: 'var(--accent-blue-dim)' }
+  }
 
   return (
     <header className="topbar" style={{ left: sidebarWidth }}>
@@ -67,6 +95,7 @@ export default function Topbar({ sidebarWidth = 240, onSearch }) {
       </div>
 
       <div className="topbar-right">
+      {isTransactionsPage && (
         <div className="search-wrap">
           <Search size={14} className="search-icon" />
           <input
@@ -76,11 +105,11 @@ export default function Topbar({ sidebarWidth = 240, onSearch }) {
             onChange={e => setSearchVal(e.target.value)}
           />
         </div>
+      )}
 
-        {/* Notification button — now functional */}
-        <div style={{ position: 'relative' }} ref={notifPanelRef}>
-          <button
-            className="topbar-icon-btn notif-btn"
+      <div style={{ position: 'relative' }} ref={notifPanelRef}>
+        <button
+          className="topbar-icon-btn notif-btn"
             title="Notifications"
             onClick={() => setShowNotifs(v => !v)}
             style={{ background: showNotifs ? 'var(--bg-card-hover)' : undefined }}
@@ -91,7 +120,6 @@ export default function Topbar({ sidebarWidth = 240, onSearch }) {
             )}
           </button>
 
-          {/* Dropdown panel */}
           {showNotifs && (
             <div className="notif-panel">
               <div className="notif-panel-header">
@@ -128,8 +156,15 @@ export default function Topbar({ sidebarWidth = 240, onSearch }) {
                       className={`notif-item ${!n.read ? 'unread' : ''}`}
                       onClick={() => markRead(n.id)}
                     >
-                      <div className="notif-icon-wrap" style={{ background: n.color + '20' }}>
-                        <n.icon size={14} style={{ color: n.color }} strokeWidth={2} />
+                      <div
+                        className="notif-icon-wrap"
+                        style={{ background: getNotifVisual(n.type).background }}
+                      >
+                        {(() => {
+                          const Visual = getNotifVisual(n.type).icon
+                          const color = getNotifVisual(n.type).color
+                          return <Visual size={14} style={{ color }} strokeWidth={2} />
+                        })()}
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '0.82rem', fontWeight: n.read ? 400 : 600, marginBottom: 2 }}>
@@ -139,7 +174,7 @@ export default function Topbar({ sidebarWidth = 240, onSearch }) {
                           {n.body}
                         </div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 4 }}>
-                          {n.time}
+                          {formatNotificationTime(n.createdAt)}
                         </div>
                       </div>
                       <button
@@ -157,7 +192,7 @@ export default function Topbar({ sidebarWidth = 240, onSearch }) {
               {notifications.length > 0 && (
                 <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', textAlign: 'center' }}>
                   <button
-                    onClick={() => { setNotifications([]); setShowNotifs(false) }}
+                    onClick={() => { setStoredNotifications([]); setNotifications([]); setShowNotifs(false) }}
                     style={{ fontSize: '0.75rem', color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
                   >
                     Clear all
