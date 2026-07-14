@@ -9,7 +9,7 @@ target/
 !.mvn/wrapper/maven-wrapper.properties
 
 # ── Spring Boot ────────────────────────────────────────────────────
-backend/src/main/resources/application-prod.properties
+backend/src/main/resources/application.properties
 
 # ── Node / React ───────────────────────────────────────────────────
 node_modules/
