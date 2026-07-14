@@ -3,7 +3,6 @@ package com.financetracker.controller;
 import com.financetracker.dto.request.BudgetRequest;
 import com.financetracker.dto.response.BudgetResponse;
 import com.financetracker.service.BudgetService;
-import jakarta.websocket.server.PathParam;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
