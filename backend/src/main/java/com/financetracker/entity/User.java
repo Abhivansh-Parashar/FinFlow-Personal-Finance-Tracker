@@ -54,7 +54,8 @@ public class User implements UserDetails {
     @Column(nullable = false)
     @Builder.Default
     private AuthProvider authProvider = AuthProvider.LOCAL;
-
+    @Column(name = "profile_picture_url")
+    private String profilePictureUrl;
 
     @PrePersist
     public void onCreate() {

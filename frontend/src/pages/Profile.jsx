@@ -1,14 +1,19 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useRef } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { userService, getApiPayload, getNotificationSettings, setNotificationSettings } from '../services/api'
-import { Edit2, Save, Shield, LogOut, CheckCircle } from 'lucide-react'
+import { userService, getApiPayload } from '../services/api'
+import {
+  User, Mail, Phone, Edit2, Save, Shield,
+  Bell, Palette, LogOut, CheckCircle, Camera, Trash2, X
+} from 'lucide-react'
 
 export default function Profile() {
   const { user, setUser, logout } = useAuth()
-  const [editing, setEditing]   = useState(false)
-  const [saving, setSaving]     = useState(false)
-  const [saveOk, setSaveOk]     = useState(false)
-  const [error, setError]       = useState('')
+  const [editing, setEditing]     = useState(false)
+  const [saving, setSaving]       = useState(false)
+  const [saveOk, setSaveOk]       = useState(false)
+  const [error, setError]         = useState('')
+  const [activeSection, setActiveSection] = useState('personal')
+
   const [form, setForm] = useState({
     name:          user?.name          ?? '',
     email:         user?.email         ?? '',
@@ -17,50 +22,28 @@ export default function Profile() {
     monthlyBudget: user?.monthlyBudget ?? '',
   })
 
-  useEffect(() => {
-    userService.getProfile().then(res => {
-      const data = getApiPayload(res)
-      if (data) {
-        setUser(prev => ({ ...prev, ...data }))
-        setForm({
-          name:          data.name          ?? '',
-          email:         data.email         ?? '',
-          phone:         data.phone         ?? '',
-          currency:      data.currency      ?? '₹',
-          monthlyBudget: data.monthlyBudget ?? '',
-        })
-      }
-    }).catch(err => console.error('Failed to fetch profile', err))
-  }, [setUser])
-
-  // Password change state
   const [pwForm, setPwForm]       = useState({ oldPassword: '', newPassword: '', confirm: '' })
   const [pwSaving, setPwSaving]   = useState(false)
   const [pwError, setPwError]     = useState('')
   const [pwSuccess, setPwSuccess] = useState(false)
 
-  // Notification toggles
-  const [notifs, setNotifs] = useState(() => {
-    const settings = getNotificationSettings()
-    return [
-      { key: 'budgetAlerts',      label: 'Budget Alerts',           desc: "Get notified when you're close to your budget limit", enabled: settings.budgetAlerts },
-      { key: 'txnReminders',      label: 'Transaction Reminders',   desc: 'Show a notification whenever you add a transaction', enabled: settings.txnReminders },
-      { key: 'monthlySummary',    label: 'Monthly Summary',         desc: 'Show a monthly summary update in the app', enabled: settings.monthlySummary },
-      { key: 'largeTxnAlert',     label: 'Large Transaction Alert', desc: 'Alert for transactions above ₹10,000', enabled: settings.largeTxnAlert },
-      { key: 'weeklyReport',      label: 'Weekly Report',           desc: 'Show weekly report updates in the app', enabled: settings.weeklyReport },
-    ]
-  })
+  // Profile picture state
+  const [picUploading, setPicUploading] = useState(false)
+  const [picError, setPicError]         = useState('')
+  const [picPreview, setPicPreview]     = useState(user?.profilePictureUrl ?? null)
+  const fileInputRef = useRef(null)
 
-  useEffect(() => {
-    setNotificationSettings(notifs.reduce((acc, item) => {
-      acc[item.key] = item.enabled
-      return acc
-    }, {}))
-  }, [notifs])
+  const [notifs, setNotifs] = useState([
+    { key: 'budgetAlerts',   label: 'Budget Alerts',          desc: "Get notified when you're close to your budget limit", enabled: true  },
+    { key: 'txnReminders',   label: 'Transaction Reminders',  desc: 'Reminders to log daily transactions',                 enabled: false },
+    { key: 'monthlySummary', label: 'Monthly Summary Email',  desc: 'Receive monthly financial summary via email',         enabled: true  },
+    { key: 'largeTxnAlert',  label: 'Large Transaction Alert',desc: 'Alert for transactions above ₹10,000',               enabled: true  },
+    { key: 'weeklyReport',   label: 'Weekly Report',          desc: 'Weekly spending insights every Monday',               enabled: false },
+  ])
 
   const initials = user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'
 
-  // FIX: Save now calls the real API
+  // ── Save profile ──────────────────────────────────────────────────
   const handleSave = async () => {
     try {
       setSaving(true)
@@ -71,18 +54,18 @@ export default function Profile() {
         monthlyBudget: form.monthlyBudget ? Number(form.monthlyBudget) : undefined,
       })
       const updated = getApiPayload(res)
-      if (updated) setUser({ ...user, ...updated })
-      else setUser({ ...user, name: form.name, currency: form.currency, monthlyBudget: form.monthlyBudget })
+      setUser(updated ? { ...user, ...updated } : { ...user, ...form })
       setEditing(false)
       setSaveOk(true)
       setTimeout(() => setSaveOk(false), 3000)
-    } catch (err) {
-      setError('Failed to save changes. Check that the backend /users/me endpoint is implemented.')
+    } catch {
+      setError('Failed to save changes.')
     } finally {
       setSaving(false)
     }
   }
 
+  // ── Change password ───────────────────────────────────────────────
   const handlePasswordChange = async () => {
     setPwError('')
     if (pwForm.newPassword !== pwForm.confirm) {
@@ -91,7 +74,10 @@ export default function Profile() {
     }
     try {
       setPwSaving(true)
-      await userService.changePassword({ oldPassword: pwForm.oldPassword, newPassword: pwForm.newPassword })
+      await userService.changePassword({
+        oldPassword: pwForm.oldPassword,
+        newPassword: pwForm.newPassword
+      })
       setPwSuccess(true)
       setPwForm({ oldPassword: '', newPassword: '', confirm: '' })
       setTimeout(() => setPwSuccess(false), 3000)
@@ -102,10 +88,66 @@ export default function Profile() {
     }
   }
 
+  // ── Profile picture — pick file ───────────────────────────────────
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // client-side validation
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      setPicError('Only JPEG, PNG and WebP images are allowed')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setPicError('Image must be under 5MB')
+      return
+    }
+
+    // show preview immediately
+    const previewUrl = URL.createObjectURL(file)
+    setPicPreview(previewUrl)
+    setPicError('')
+
+    // upload to backend
+    try {
+      setPicUploading(true)
+      const res = await userService.uploadProfilePicture(file)
+      const updated = getApiPayload(res)
+      if (updated?.profilePictureUrl) {
+        setPicPreview(updated.profilePictureUrl)
+        setUser({ ...user, profilePictureUrl: updated.profilePictureUrl })
+      }
+    } catch (err) {
+      setPicError(err.response?.data?.message ?? 'Failed to upload image')
+      setPicPreview(user?.profilePictureUrl ?? null) // revert preview
+    } finally {
+      setPicUploading(false)
+      // reset file input so same file can be re-selected
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  // ── Profile picture — delete ──────────────────────────────────────
+  const handleDeletePicture = async () => {
+    if (!window.confirm('Remove your profile picture?')) return
+    try {
+      setPicUploading(true)
+      await userService.deleteProfilePicture()
+      setPicPreview(null)
+      setUser({ ...user, profilePictureUrl: null })
+    } catch {
+      setPicError('Failed to remove profile picture')
+    } finally {
+      setPicUploading(false)
+    }
+  }
+
   const toggleNotif = (key) => {
     setNotifs(prev => prev.map(n => n.key === key ? { ...n, enabled: !n.enabled } : n))
   }
 
+  // ── Render ────────────────────────────────────────────────────────
   return (
       <div className="page">
         <div className="page-header">
@@ -115,6 +157,7 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* Success / error banners */}
         {saveOk && (
             <div style={{ background: 'var(--accent-green-dim)', color: 'var(--accent-green)', padding: '10px 16px', borderRadius: 8, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <CheckCircle size={15} /> Profile saved successfully
@@ -127,109 +170,324 @@ export default function Profile() {
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 24 }}>
-          {/* Left panel */}
+
+          {/* ── Left panel ─────────────────────────────────────────── */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* Avatar card */}
             <div className="card" style={{ textAlign: 'center', padding: '32px 24px' }}>
-              <div style={{ width: 80, height: 80, background: 'var(--accent-green-dim)', border: '3px solid rgba(0,200,150,0.3)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-green)', margin: '0 auto 16px' }}>
-                {initials}
-              </div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>{user?.name}</div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 16 }}>{user?.email}</div>
-              <span className="badge badge-green" style={{ fontSize: '0.72rem' }}>✓ Verified Account</span>
-            </div>
 
-            <div className="card" style={{ padding: '8px' }}>
-              <button className="btn btn-danger" style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 14px', gap: 10 }} onClick={logout}>
-                <LogOut size={15} /> Sign Out
-              </button>
-            </div>
-          </div>
+              {/* Profile picture with upload overlay */}
+              <div style={{ position: 'relative', width: 88, height: 88, margin: '0 auto 16px' }}>
 
-          {/* Right panel */}
-          <div>
-            <div className="card fade-in" style={{ marginBottom: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem' }}>Personal Information</div>
-                {editing
-                    ? <button className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={handleSave} disabled={saving}>
-                      <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
-                    </button>
-                    : <button className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={() => setEditing(true)}>
-                      <Edit2 size={14} /> Edit
-                    </button>
-                }
-              </div>
-
-              <div className="grid-2" style={{ gap: 18 }}>
-                {[
-                  { label: 'Full Name',    key: 'name',   type: 'text',   placeholder: 'Your full name' },
-                  { label: 'Email',        key: 'email',  type: 'email',  placeholder: 'your@email.com', disabled: true },
-                  { label: 'Phone',        key: 'phone',  type: 'tel',    placeholder: '+91 xxxxx xxxxx' },
-                  { label: 'Monthly Budget (₹)', key: 'monthlyBudget', type: 'number', placeholder: '50000' },
-                ].map(field => (
-                    <div key={field.key} className="form-group">
-                      <label className="form-label">{field.label}</label>
-                      <input type={field.type} className="form-input"
-                             value={form[field.key] || ''}
-                             onChange={e => setForm({ ...form, [field.key]: e.target.value })}
-                             disabled={!editing || field.disabled}
-                             placeholder={field.placeholder}
-                             style={{ opacity: (editing && !field.disabled) ? 1 : 0.6 }}
-                      />
+                {/* Avatar / initials */}
+                {picPreview ? (
+                    <img
+                        src={picPreview}
+                        alt="Profile"
+                        style={{
+                          width: 88, height: 88, borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: '3px solid rgba(0,200,150,0.3)'
+                        }}
+                    />
+                ) : (
+                    <div style={{
+                      width: 88, height: 88,
+                      background: 'var(--accent-green-dim)',
+                      border: '3px solid rgba(0,200,150,0.3)',
+                      borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: 'var(--font-display)',
+                      fontSize: '2rem', fontWeight: 700,
+                      color: 'var(--accent-green)',
+                    }}>
+                      {initials}
                     </div>
-                ))}
-                <div className="form-group">
-                  <label className="form-label">Currency</label>
-                  <select className="form-input" value={form.currency} onChange={e => setForm({ ...form, currency: e.target.value })} disabled={!editing} style={{ opacity: editing ? 1 : 0.6 }}>
-                    <option value="₹">₹ Indian Rupee (INR)</option>
-                    <option value="$">$ US Dollar (USD)</option>
-                    <option value="€">€ Euro (EUR)</option>
-                    <option value="£">£ British Pound (GBP)</option>
-                  </select>
-                </div>
+                )}
+
+                {/* Upload overlay button */}
+                <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={picUploading}
+                    title="Change profile picture"
+                    style={{
+                      position: 'absolute', bottom: 0, right: 0,
+                      width: 28, height: 28,
+                      background: 'var(--accent-green)',
+                      border: '2px solid var(--bg-card)',
+                      borderRadius: '50%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: picUploading ? 'not-allowed' : 'pointer',
+                      opacity: picUploading ? 0.6 : 1,
+                    }}
+                >
+                  <Camera size={13} color="#000" strokeWidth={2.5} />
+                </button>
+
+                {/* Hidden file input */}
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                    onChange={handleFileChange}
+                />
+              </div>
+
+              {/* Upload status */}
+              {picUploading && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--accent-green)', marginBottom: 8 }}>
+                    Uploading...
+                  </div>
+              )}
+              {picError && (
+                  <div style={{ fontSize: '0.75rem', color: 'var(--accent-red)', marginBottom: 8 }}>
+                    {picError}
+                  </div>
+              )}
+
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 4 }}>
+                {user?.name}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 16 }}>
+                {user?.email}
+              </div>
+
+              <span className="badge badge-green" style={{ fontSize: '0.72rem' }}>
+              ✓ Verified Account
+            </span>
+
+              {/* Remove picture button — only show if picture exists */}
+              {picPreview && (
+                  <div style={{ marginTop: 14 }}>
+                    <button
+                        onClick={handleDeletePicture}
+                        disabled={picUploading}
+                        className="btn btn-danger"
+                        style={{ padding: '5px 12px', fontSize: '0.75rem', gap: 5 }}
+                    >
+                      <Trash2 size={12} /> Remove photo
+                    </button>
+                  </div>
+              )}
+
+              <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid var(--border)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                Click the camera icon to change photo
               </div>
             </div>
 
-            <div className="card fade-in" style={{ marginBottom: 20 }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 24 }}>Security Settings</div>
-              {pwError && <div style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: '0.85rem' }}>{pwError}</div>}
-              {pwSuccess && <div style={{ background: 'var(--accent-green-dim)', color: 'var(--accent-green)', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: '0.85rem' }}>Password changed successfully!</div>}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <div className="form-group">
-                  <label className="form-label">Current Password</label>
-                  <input type="password" className="form-input" placeholder="Enter current password"
-                         value={pwForm.oldPassword} onChange={e => setPwForm({ ...pwForm, oldPassword: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">New Password</label>
-                  <input type="password" className="form-input" placeholder="Enter new password"
-                         value={pwForm.newPassword} onChange={e => setPwForm({ ...pwForm, newPassword: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Confirm New Password</label>
-                  <input type="password" className="form-input" placeholder="Confirm new password"
-                         value={pwForm.confirm} onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })} />
-                </div>
-                <button className="btn btn-primary" style={{ width: 'fit-content' }} onClick={handlePasswordChange} disabled={pwSaving}>
-                  <Shield size={14} /> {pwSaving ? 'Updating...' : 'Update Password'}
+            {/* Section nav */}
+            <div className="card" style={{ padding: '8px' }}>
+              {[
+                { id: 'personal',      icon: User,    label: 'Personal Info'  },
+                { id: 'preferences',   icon: Palette, label: 'Preferences'    },
+                { id: 'security',      icon: Shield,  label: 'Security'       },
+                { id: 'notifications', icon: Bell,    label: 'Notifications'  },
+              ].map(s => (
+                  <button
+                      key={s.id}
+                      onClick={() => setActiveSection(s.id)}
+                      className="btn"
+                      style={{
+                        width: '100%', justifyContent: 'flex-start',
+                        padding: '10px 14px', gap: 10, marginBottom: 2,
+                        background: activeSection === s.id ? 'var(--accent-green-dim)' : 'transparent',
+                        color:      activeSection === s.id ? 'var(--accent-green)'     : 'var(--text-secondary)',
+                        fontWeight: activeSection === s.id ? 600 : 400,
+                      }}
+                  >
+                    <s.icon size={15} strokeWidth={1.8} />
+                    {s.label}
+                  </button>
+              ))}
+
+              <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8 }}>
+                <button
+                    className="btn btn-danger"
+                    style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 14px', gap: 10 }}
+                    onClick={logout}
+                >
+                  <LogOut size={15} /> Sign Out
                 </button>
               </div>
             </div>
+          </div>
 
-            <div className="card fade-in">
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 24 }}>Notification Settings</div>
-              {notifs.map(notif => (
-                  <div key={notif.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div>
-                      <div style={{ fontWeight: 500, fontSize: '0.875rem', marginBottom: 2 }}>{notif.label}</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{notif.desc}</div>
+          {/* ── Right panel ────────────────────────────────────────── */}
+          <div>
+
+            {/* Personal Info */}
+            {activeSection === 'personal' && (
+                <div className="card fade-in">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem' }}>
+                      Personal Information
                     </div>
-                    <div onClick={() => toggleNotif(notif.key)} style={{ width: 40, height: 22, borderRadius: 100, background: notif.enabled ? 'var(--accent-green)' : 'var(--bg-secondary)', border: `1px solid ${notif.enabled ? 'var(--accent-green)' : 'var(--border)'}`, position: 'relative', cursor: 'pointer', flexShrink: 0, transition: 'var(--transition)' }}>
-                      <div style={{ position: 'absolute', top: 2, left: notif.enabled ? 20 : 2, width: 16, height: 16, borderRadius: '50%', background: notif.enabled ? '#000' : 'var(--text-muted)', transition: 'left 0.2s ease' }} />
+                    {editing
+                        ? (
+                            <button className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={handleSave} disabled={saving}>
+                              <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
+                            </button>
+                        ) : (
+                            <button className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={() => setEditing(true)}>
+                              <Edit2 size={14} /> Edit
+                            </button>
+                        )
+                    }
+                  </div>
+
+                  <div className="grid-2" style={{ gap: 18 }}>
+                    {[
+                      { label: 'Full Name',          key: 'name',          type: 'text',   placeholder: 'Your full name'     },
+                      { label: 'Email',              key: 'email',         type: 'email',  placeholder: 'your@email.com', disabled: true },
+                      { label: 'Phone',              key: 'phone',         type: 'tel',    placeholder: '+91 xxxxx xxxxx'   },
+                      { label: 'Monthly Budget (₹)', key: 'monthlyBudget', type: 'number', placeholder: '50000'             },
+                    ].map(field => (
+                        <div key={field.key} className="form-group">
+                          <label className="form-label">{field.label}</label>
+                          <input
+                              type={field.type}
+                              className="form-input"
+                              value={form[field.key] || ''}
+                              onChange={e => setForm({ ...form, [field.key]: e.target.value })}
+                              disabled={!editing || field.disabled}
+                              placeholder={field.placeholder}
+                              style={{ opacity: (editing && !field.disabled) ? 1 : 0.6 }}
+                          />
+                        </div>
+                    ))}
+
+                    <div className="form-group">
+                      <label className="form-label">Currency</label>
+                      <select
+                          className="form-input"
+                          value={form.currency}
+                          onChange={e => setForm({ ...form, currency: e.target.value })}
+                          disabled={!editing}
+                          style={{ opacity: editing ? 1 : 0.6 }}
+                      >
+                        <option value="₹">₹ Indian Rupee (INR)</option>
+                        <option value="$">$ US Dollar (USD)</option>
+                        <option value="€">€ Euro (EUR)</option>
+                        <option value="£">£ British Pound (GBP)</option>
+                      </select>
                     </div>
                   </div>
-              ))}
-            </div>
+                </div>
+            )}
+
+            {/* Preferences */}
+            {activeSection === 'preferences' && (
+                <div className="card fade-in">
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 24 }}>
+                    Preferences
+                  </div>
+                  {[
+                    { label: 'Default Currency',     value: `${form.currency} (${form.currency === '₹' ? 'INR' : form.currency === '$' ? 'USD' : 'Other'})` },
+                    { label: 'Date Format',          value: 'DD/MM/YYYY' },
+                    { label: 'Theme',                value: 'Dark'       },
+                    { label: 'Language',             value: 'English'    },
+                    { label: 'Financial Year Start', value: 'April'      },
+                  ].map(pref => (
+                      <div key={pref.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{pref.label}</span>
+                        <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{pref.value}</span>
+                      </div>
+                  ))}
+                </div>
+            )}
+
+            {/* Security */}
+            {activeSection === 'security' && (
+                <div className="card fade-in">
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 24 }}>
+                    Security Settings
+                  </div>
+
+                  {pwError && (
+                      <div style={{ background: 'var(--accent-red-dim)', color: 'var(--accent-red)', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: '0.85rem' }}>
+                        {pwError}
+                      </div>
+                  )}
+                  {pwSuccess && (
+                      <div style={{ background: 'var(--accent-green-dim)', color: 'var(--accent-green)', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: '0.85rem' }}>
+                        Password changed successfully!
+                      </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    <div className="form-group">
+                      <label className="form-label">Current Password</label>
+                      <input type="password" className="form-input" placeholder="Enter current password"
+                             value={pwForm.oldPassword} onChange={e => setPwForm({ ...pwForm, oldPassword: e.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">New Password</label>
+                      <input type="password" className="form-input" placeholder="Min 8 characters"
+                             value={pwForm.newPassword} onChange={e => setPwForm({ ...pwForm, newPassword: e.target.value })} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Confirm New Password</label>
+                      <input type="password" className="form-input" placeholder="Repeat new password"
+                             value={pwForm.confirm} onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })} />
+                    </div>
+                    <button
+                        className="btn btn-primary"
+                        style={{ width: 'fit-content' }}
+                        onClick={handlePasswordChange}
+                        disabled={pwSaving}
+                    >
+                      <Shield size={14} /> {pwSaving ? 'Updating...' : 'Update Password'}
+                    </button>
+                  </div>
+
+                  <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
+                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Two-Factor Authentication</div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 12 }}>
+                      Add an extra layer of security to your account.
+                    </div>
+                    <button className="btn btn-secondary">
+                      <Shield size={14} /> Enable 2FA
+                    </button>
+                  </div>
+                </div>
+            )}
+
+            {/* Notifications */}
+            {activeSection === 'notifications' && (
+                <div className="card fade-in">
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 24 }}>
+                    Notification Settings
+                  </div>
+                  {notifs.map(notif => (
+                      <div key={notif.key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
+                        <div>
+                          <div style={{ fontWeight: 500, fontSize: '0.875rem', marginBottom: 2 }}>{notif.label}</div>
+                          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{notif.desc}</div>
+                        </div>
+                        <div
+                            onClick={() => toggleNotif(notif.key)}
+                            style={{
+                              width: 40, height: 22, borderRadius: 100, cursor: 'pointer',
+                              background: notif.enabled ? 'var(--accent-green)' : 'var(--bg-secondary)',
+                              border: `1px solid ${notif.enabled ? 'var(--accent-green)' : 'var(--border)'}`,
+                              position: 'relative', flexShrink: 0, transition: 'var(--transition)'
+                            }}
+                        >
+                          <div style={{
+                            position: 'absolute', top: 2,
+                            left: notif.enabled ? 20 : 2,
+                            width: 16, height: 16, borderRadius: '50%',
+                            background: notif.enabled ? '#000' : 'var(--text-muted)',
+                            transition: 'left 0.2s ease'
+                          }} />
+                        </div>
+                      </div>
+                  ))}
+                </div>
+            )}
+
           </div>
         </div>
       </div>

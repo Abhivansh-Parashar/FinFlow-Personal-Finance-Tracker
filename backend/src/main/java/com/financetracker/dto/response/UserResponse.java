@@ -18,4 +18,5 @@ public class UserResponse {
     private BigDecimal monthlyBudget;
     private Role role;
     private LocalDateTime createdAt;
+    private String profilePictureUrl;
 }

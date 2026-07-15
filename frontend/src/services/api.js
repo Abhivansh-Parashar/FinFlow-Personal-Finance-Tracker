@@ -304,10 +304,20 @@ export const reportService = {
   yearlySummary:     (year)   => api.get('/reports/yearly-summary',     { params: { year } }),
 }
 
-// ── User Service ─────────────────────────────────────────────────────────────
 export const userService = {
   getProfile:     ()     => api.get('/users/me'),
   updateProfile:  (data) => api.put('/users/me', data),
   changePassword: (data) => api.put('/users/me/password', data),
   deleteAccount:  ()     => api.delete('/users/me'),
+
+  // NEW — profile picture
+  uploadProfilePicture: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/users/me/profile-picture', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+
+  deleteProfilePicture: () => api.delete('/users/me/profile-picture'),
 }

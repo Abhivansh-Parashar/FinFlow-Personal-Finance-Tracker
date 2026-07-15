@@ -2,6 +2,7 @@ package com.financetracker.service;
 
 import com.financetracker.dto.request.UpdateProfileRequest;
 import com.financetracker.dto.response.UserResponse;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Service contract for user profile management.
@@ -21,4 +22,30 @@ public interface UserService {
     void changePassword(String oldPassword, String newPassword);
 
     void deleteAccount();
+
+    /**
+     * Upload or replace the authenticated user's profile picture.
+     *
+     * TODO:
+     *  1. Get current user from SecurityContext
+     *  2. If user.profilePictureUrl is not null → call fileStorageService.deleteFile()
+     *  3. Call fileStorageService.saveProfilePicture(file, user.getId())
+     *  4. Set user.setProfilePictureUrl(returnedUrl)
+     *  5. Save user to DB
+     *  6. Return mapped UserResponse
+     */
+    UserResponse uploadProfilePicture(MultipartFile file);
+
+    /**
+     * Remove the authenticated user's profile picture.
+     *
+     * TODO:
+     *  1. Get current user from SecurityContext
+     *  2. If profilePictureUrl is null → throw ResourceNotFoundException("No profile picture set")
+     *  3. Call fileStorageService.deleteFile(user.getProfilePictureUrl())
+     *  4. Set user.setProfilePictureUrl(null)
+     *  5. Save user to DB
+     *  6. Return mapped UserResponse
+     */
+    UserResponse deleteProfilePicture();
 }
