@@ -75,7 +75,6 @@ public class JwtService {
                 .getPayload()
                 .getSubject();
     }
-
     private boolean isTokenExpired(String token) {
         Date expiry =  Jwts
                 .parser()

@@ -3,8 +3,11 @@ package com.financetracker.repository;
 import com.financetracker.entity.Category;
 import com.financetracker.enums.TransactionType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,5 +28,19 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     List<Category> findAllByIsDefaultTrue();
     boolean existsByNameAndUserId(String name, Long userId);
     List<Category> findAllByIsDefaultTrueAndType(TransactionType type);
+    @Query("""
+    SELECT c
+    FROM Category c
+    WHERE c.type = :type
+    AND (
+            c.isDefault = true
+            OR c.user.id = :userId
+    )
+    ORDER BY c.name
+    """)
+    List<Category> findAvailableCategories(
+            @Param("userId") Long userId,
+            @Param("type") TransactionType type
+    );
 
 }

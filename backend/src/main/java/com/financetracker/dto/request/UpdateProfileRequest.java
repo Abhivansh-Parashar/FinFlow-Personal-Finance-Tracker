@@ -4,15 +4,12 @@ import jakarta.validation.constraints.*;
 import lombok.*;
 import java.math.BigDecimal;
 
-/**
- * TODO: Add fields — name, currency, monthlyBudget
- */
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class UpdateProfileRequest {
     @NotBlank
     private String name;
-    @NotBlank @Size(min = 3, max = 3)
+    @NotBlank @Size(min = 1, max = 10)
     private String currency;
-    @NotNull @Positive
+    @Positive
     private BigDecimal monthlyBudget;
 }

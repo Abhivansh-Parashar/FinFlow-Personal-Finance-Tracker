@@ -4,6 +4,7 @@ import com.financetracker.dto.request.UpdateProfileRequest;
 import com.financetracker.dto.response.UserResponse;
 import com.financetracker.entity.User;
 import com.financetracker.repository.UserRepository;
+import com.financetracker.service.FileStorageService;
 import com.financetracker.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -13,6 +14,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+
+import static com.financetracker.util.SecurityUtils.getCurrentUser;
 
 
 /**
@@ -35,14 +40,12 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final FileStorageService fileStorageService;
 
     @Override
     @Transactional(readOnly = true)
     public UserResponse getProfile() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        String email = authentication.getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
+        User user = getCurrentUser();
 
         return UserResponse.builder()
                 .id(user.getId())
@@ -57,9 +60,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse updateProfile(UpdateProfileRequest request) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String email = authentication.getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
+        User user = getCurrentUser();
 
         user.setName(request.getName());
         user.setCurrency(request.getCurrency());
@@ -80,10 +81,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void changePassword(String oldPassword, String newPassword) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        String email = authentication.getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
+        User user = getCurrentUser();
 
         Boolean passwordMatched = passwordEncoder.matches(oldPassword, user.getPassword());
 
@@ -98,25 +96,54 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void deleteAccount() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        String email = authentication.getName();
-        User user = userRepository.findByEmail(email).orElseThrow();
+        User user = getCurrentUser();
 
         userRepository.delete(user);
     }
 
     @Override
     @Transactional
-    public UserResponse uploadProfilePicture(MultipartFile file) {
-        // TODO: Implement — see UserService Javadoc above
-        throw new UnsupportedOperationException("Not yet implemented");
+    public UserResponse uploadProfilePicture(MultipartFile file) throws IOException {
+        User user = getCurrentUser();
+        String newProfilePictureUrl = fileStorageService.saveProfilePicture(
+                file,
+                user.getId()
+        );
+
+        // Delete old picture file before replacing
+        fileStorageService.deleteFile(user.getProfilePictureUrl());
+
+        // Persist the new URL on the user entity
+        user.setProfilePictureUrl(newProfilePictureUrl);
+        userRepository.save(user);
+
+        return UserResponse.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .currency(user.getCurrency())
+                .monthlyBudget(user.getMonthlyBudget())
+                .role(user.getRole())
+                .profilePictureUrl(newProfilePictureUrl)
+                .build();
     }
 
     @Override
     @Transactional
     public UserResponse deleteProfilePicture() {
-        // TODO: Implement — see UserService Javadoc above
-        throw new UnsupportedOperationException("Not yet implemented");
+        User user = getCurrentUser();
+        fileStorageService.deleteFile(
+                user.getProfilePictureUrl()
+        );
+        user.setProfilePictureUrl(null);
+
+        return UserResponse.builder()
+                .name(user.getName())
+                .email(user.getEmail())
+                .currency(user.getCurrency())
+                .monthlyBudget(user.getMonthlyBudget())
+                .role(user.getRole())
+                .profilePictureUrl(user.getProfilePictureUrl())
+                .build();
     }
 }

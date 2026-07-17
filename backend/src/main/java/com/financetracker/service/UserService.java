@@ -4,6 +4,8 @@ import com.financetracker.dto.request.UpdateProfileRequest;
 import com.financetracker.dto.response.UserResponse;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+
 /**
  * Service contract for user profile management.
  *
@@ -34,7 +36,7 @@ public interface UserService {
      *  5. Save user to DB
      *  6. Return mapped UserResponse
      */
-    UserResponse uploadProfilePicture(MultipartFile file);
+    UserResponse uploadProfilePicture(MultipartFile file) throws IOException;
 
     /**
      * Remove the authenticated user's profile picture.

@@ -14,6 +14,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import UploadReceipt from './pages/UploadReceipt'
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuth()
@@ -53,10 +54,11 @@ function AppRoutes() {
         <Route path="income"       element={<Income />} />
         <Route path="expenses"     element={<Expenses />} />
         <Route path="transactions" element={<Transactions />} />
-        <Route path="budget"       element={<Budget />} />
-        <Route path="categories"   element={<Categories />} />
-        <Route path="reports"      element={<Reports />} />
-        <Route path="profile"      element={<Profile />} />
+        <Route path="budget"          element={<Budget />} />
+        <Route path="categories"      element={<Categories />} />
+        <Route path="reports"         element={<Reports />} />
+        <Route path="profile"         element={<Profile />} />
+        <Route path="upload-receipt"  element={<UploadReceipt />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

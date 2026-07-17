@@ -4,18 +4,19 @@ import { useAuth } from '../../context/AuthContext'
 import {
   LayoutDashboard, TrendingUp, TrendingDown, List,
   PieChart, Target, BarChart2, User, LogOut, Wallet,
-  ChevronLeft, ChevronRight, Tag
+  ChevronLeft, ChevronRight, Tag, ScanLine
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/income',       icon: TrendingUp,      label: 'Income' },
-  { to: '/expenses',     icon: TrendingDown,    label: 'Expenses' },
-  { to: '/transactions', icon: List,            label: 'Transactions' },
-  { to: '/budget',       icon: Target,          label: 'Budget' },
-  { to: '/categories',   icon: Tag,             label: 'Categories' },
-  { to: '/reports',      icon: BarChart2,       label: 'Reports' },
-  { to: '/profile',      icon: User,            label: 'Profile' },
+  { to: '/dashboard',      icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/income',         icon: TrendingUp,      label: 'Income' },
+  { to: '/expenses',       icon: TrendingDown,    label: 'Expenses' },
+  { to: '/transactions',   icon: List,            label: 'Transactions' },
+  { to: '/budget',         icon: Target,          label: 'Budget' },
+  { to: '/categories',     icon: Tag,             label: 'Categories' },
+  { to: '/reports',        icon: BarChart2,       label: 'Reports' },
+  { to: '/upload-receipt', icon: ScanLine,        label: 'Scan Receipt', highlight: true },
+  { to: '/profile',        icon: User,            label: 'Profile' },
 ]
 
 export default function Sidebar({ collapsed = false, onToggle }) {
@@ -46,15 +47,16 @@ export default function Sidebar({ collapsed = false, onToggle }) {
 
       {/* Nav */}
       <nav className="sidebar-nav">
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+        {NAV_ITEMS.map(({ to, icon: Icon, label, highlight }) => (
           <NavLink
             key={to}
             to={to}
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''} ${highlight ? 'nav-highlight' : ''}`}
             title={collapsed ? label : undefined}
           >
             <Icon size={18} strokeWidth={1.8} />
             {!collapsed && <span>{label}</span>}
+            {!collapsed && highlight && <span className="nav-ai-badge">AI</span>}
           </NavLink>
         ))}
       </nav>
@@ -63,7 +65,17 @@ export default function Sidebar({ collapsed = false, onToggle }) {
       <div className="sidebar-footer">
         {!collapsed ? (
           <div className="user-info">
-            <div className="user-avatar">{initials}</div>
+            <div className="user-avatar">
+              {user?.profilePictureUrl ? (
+                <img
+                  src={user.profilePictureUrl}
+                  alt={user?.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                />
+              ) : (
+                initials
+              )}
+            </div>
             <div className="user-details">
               <div className="user-name">{user?.name?.split(' ')[0]}</div>
               <div className="user-email" title={user?.email}>{user?.email}</div>
@@ -163,6 +175,41 @@ export default function Sidebar({ collapsed = false, onToggle }) {
           background: var(--accent-green);
           border-radius: 0 3px 3px 0;
         }
+        .nav-item.nav-highlight {
+          background: linear-gradient(90deg, rgba(167,139,250,0.1), rgba(167,139,250,0.04));
+          border: 1px solid rgba(167,139,250,0.15);
+          color: var(--accent-purple);
+          margin: 4px 0;
+          animation: navHighlightPulse 3s ease-in-out infinite;
+        }
+        .nav-item.nav-highlight:hover {
+          background: linear-gradient(90deg, rgba(167,139,250,0.18), rgba(167,139,250,0.08));
+          color: var(--accent-purple);
+          border-color: rgba(167,139,250,0.3);
+        }
+        .nav-item.nav-highlight.active {
+          background: rgba(167,139,250,0.15);
+          color: var(--accent-purple);
+          border-color: rgba(167,139,250,0.3);
+        }
+        .nav-item.nav-highlight.active::before {
+          background: var(--accent-purple);
+        }
+        @keyframes navHighlightPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(167,139,250,0); }
+          50% { box-shadow: 0 0 10px rgba(167,139,250,0.15); }
+        }
+        .nav-ai-badge {
+          margin-left: auto;
+          padding: 1px 7px;
+          background: rgba(167,139,250,0.2);
+          border: 1px solid rgba(167,139,250,0.3);
+          border-radius: 100px;
+          font-size: 0.65rem;
+          font-weight: 700;
+          color: var(--accent-purple);
+          letter-spacing: 0.04em;
+        }
         .sidebar-footer {
           padding: 12px 10px;
           border-top: 1px solid var(--border);
@@ -181,6 +228,7 @@ export default function Sidebar({ collapsed = false, onToggle }) {
           font-weight: 700;
           color: var(--accent-green);
           flex-shrink: 0;
+          overflow: hidden;
         }
         .user-details { flex: 1; min-width: 0; }
         .user-name { font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
