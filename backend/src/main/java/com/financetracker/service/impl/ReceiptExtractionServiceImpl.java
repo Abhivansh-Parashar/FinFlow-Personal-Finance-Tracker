@@ -3,7 +3,7 @@ package com.financetracker.service.impl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.financetracker.config.GeminiProperties;
+import com.financetracker.config.MistralProperties;
 import com.financetracker.dto.AI.ReceiptExtractionResult;
 import com.financetracker.entity.Category;
 import com.financetracker.entity.User;
@@ -34,8 +34,8 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class ReceiptExtractionServiceImpl implements ReceiptExtractionService {
 
-    private final WebClient geminiWebClient;
-    private final GeminiProperties geminiProperties;
+    private final WebClient mistralWebClient;
+    private final MistralProperties mistralProperties;
     private final ObjectMapper objectMapper;
     private final CategoryRepository categoryRepository;
 
@@ -104,9 +104,9 @@ public class ReceiptExtractionServiceImpl implements ReceiptExtractionService {
                         user
                 );
 
-        String response = callGemini(requestBody);
+        String response = callMistral(requestBody);
 
-        return parseGeminiResponse(response);
+        return parseMistralResponse(response);
     }
 
     private String convertToBase64(MultipartFile file) {
@@ -125,95 +125,96 @@ public class ReceiptExtractionServiceImpl implements ReceiptExtractionService {
         }
     }
 
-    private Map<String, Object> buildRequestBody(
+    private Map<String,Object> buildRequestBody(
             String base64Image,
             String mimeType,
             User user
-    ) {
+    ){
 
-        Map<String, Object> textPart = Map.of(
+        Map<String,Object> textContent = Map.of(
+                "type",
+                "text",
                 "text",
                 buildPrompt(user)
         );
 
-        Map<String, Object> inlineData = Map.of(
-                "mime_type", mimeType,
-                "data", base64Image
+
+        Map<String,Object> imageContent = Map.of(
+                "type",
+                "image_url",
+                "image_url",
+                Map.of(
+                        "url",
+                        "data:" + mimeType +
+                                ";base64," +
+                                base64Image
+                )
         );
 
-        Map<String, Object> imagePart = Map.of(
-                "inline_data",
-                inlineData
+
+        Map<String,Object> message = Map.of(
+                "role",
+                "user",
+                "content",
+                List.of(
+                        textContent,
+                        imageContent
+                )
         );
 
-        List<Object> parts = List.of(
-                textPart,
-                imagePart
-        );
-
-        Map<String, Object> content = Map.of(
-                "parts",
-                parts
-        );
-
-        List<Object> contents = List.of(content);
-
-        Map<String, Object> generationConfig = Map.of(
-                "responseMimeType",
-                RESPONSE_MIME_TYPE,
-                "temperature",
-                TEMPERATURE,
-                "maxOutputTokens",
-                MAX_OUTPUT_TOKENS
-        );
 
         return Map.of(
-                "contents",
-                contents,
-                "generationConfig",
-                generationConfig
+                "model",
+                mistralProperties.model(),
+
+                "messages",
+                List.of(message),
+
+                "temperature",
+                0.1,
+
+                "max_tokens",
+                1024
         );
     }
-    private String callGemini(Map<String, Object> requestBody) {
+    private String callMistral(
+            Map<String,Object> requestBody
+    ){
 
-        return geminiWebClient.post()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/v1beta/models/{model}:generateContent")
-                        .queryParam("key", geminiProperties.apiKey())
-                        .build(geminiProperties.model())
+        return mistralWebClient.post()
+
+                .uri(mistralProperties.url())
+
+                .header(
+                        "Authorization",
+                        "Bearer " + mistralProperties.apiKey()
                 )
+
                 .bodyValue(requestBody)
+
                 .retrieve()
+
 
                 .onStatus(
                         HttpStatusCode::is4xxClientError,
-                        response -> response.bodyToMono(String.class)
-                                .flatMap(errorBody ->
-                                        Mono.error(
-                                                new ResponseStatusException(
-                                                        response.statusCode(),
-                                                        "Gemini Error: " + errorBody
-                                                )
+                        response ->
+                                Mono.error(
+                                        new ResponseStatusException(
+                                                response.statusCode(),
+                                                "Mistral API error"
                                         )
                                 )
                 )
 
-                .onStatus(
-                        HttpStatusCode::is5xxServerError,
-                        response -> Mono.error(
-                                new ResponseStatusException(
-                                        HttpStatus.SERVICE_UNAVAILABLE,
-                                        "Gemini is temporarily unavailable."
-                                )
-                        )
-                )
 
                 .bodyToMono(String.class)
+
                 .timeout(REQUEST_TIMEOUT)
+
                 .block();
     }
 
-    private ReceiptExtractionResult parseGeminiResponse(String response) {
+    private ReceiptExtractionResult parseMistralResponse(String response) {
 
         try {
 
@@ -221,36 +222,34 @@ public class ReceiptExtractionServiceImpl implements ReceiptExtractionService {
 
             // Check if the model's response was truncated by the API
             String finishReason = root
-                    .path("candidates")
+                    .path("choices")
                     .path(0)
-                    .path("finishReason")
+                    .path("finish_reason")
                     .asText("");
 
-            if ("MAX_TOKENS".equals(finishReason)) {
-                log.warn("Gemini response was truncated (MAX_TOKENS). Consider increasing maxOutputTokens.");
+            if ("length".equals(finishReason) || "model_length".equals(finishReason)) {
+                log.warn("Mistral response was truncated. Consider increasing max_tokens.");
             }
 
             JsonNode textNode = root
-                    .path("candidates")
+                    .path("choices")
                     .path(0)
-                    .path("content")
-                    .path("parts")
-                    .path(0)
-                    .path("text");
+                    .path("message")
+                    .path("content");
 
             if (textNode.isMissingNode() || textNode.asText().isBlank()) {
 
-                log.error("Gemini returned empty response. Full API response: {}", response);
+                log.error("Mistral returned empty response. Full API response: {}", response);
 
                 throw new ResponseStatusException(
                         HttpStatus.INTERNAL_SERVER_ERROR,
-                        "Gemini returned an empty response."
+                        "Mistral returned an empty response."
                 );
             }
 
             String generatedJson = cleanJsonText(textNode.asText());
 
-            log.debug("Cleaned Gemini JSON: {}", generatedJson);
+            log.debug("Cleaned Mistral JSON: {}", generatedJson);
 
             return objectMapper.readValue(
                     generatedJson,
@@ -259,18 +258,18 @@ public class ReceiptExtractionServiceImpl implements ReceiptExtractionService {
 
         } catch (JsonProcessingException e) {
 
-            log.error("Failed to parse Gemini response. Raw response: {}", response, e);
+            log.error("Failed to parse Mistral response. Raw response: {}", response, e);
 
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Unable to parse Gemini response.",
+                    "Unable to parse Mistral response.",
                     e
             );
         }
     }
 
     /**
-     * Cleans the raw text from Gemini — strips markdown code fences
+     * Cleans the raw text from Mistral — strips markdown code fences
      * and extracts the JSON object even if surrounded by extra text.
      */
     private String cleanJsonText(String rawText) {

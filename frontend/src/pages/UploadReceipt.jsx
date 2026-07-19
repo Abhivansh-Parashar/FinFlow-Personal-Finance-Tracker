@@ -120,7 +120,7 @@ function AIThinking({ preview }) {
           <div className="brain-pulse" />
         </div>
         <div className="ai-status-title">
-          <Sparkles size={16} /> Gemini AI is reading your receipt
+          <Sparkles size={16} /> Mistral AI is reading your receipt
         </div>
         <div className="ai-bullets">
           {bullets.slice(0, visible + 1).map((b, i) => (
@@ -345,7 +345,7 @@ export default function UploadReceipt() {
             </div>
             Upload Receipt
           </div>
-          <div className="page-subtitle">Let Gemini AI read your receipt and log the expense instantly</div>
+          <div className="page-subtitle">Let Mistral AI read your receipt and log the expense instantly</div>
         </div>
         <div className="ai-badge-pill">
           <Zap size={13} />
