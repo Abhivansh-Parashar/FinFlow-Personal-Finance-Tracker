@@ -57,6 +57,42 @@ public class User implements UserDetails {
     @Column(name = "profile_picture_url")
     private String profilePictureUrl;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private String theme = "Dark";
+
+    @Column(nullable = false)
+    @Builder.Default
+    private String language = "English";
+
+    @Column(name = "date_format", nullable = false)
+    @Builder.Default
+    private String dateFormat = "DD/MM/YYYY";
+
+    @Column(name = "financial_year_start", nullable = false)
+    @Builder.Default
+    private String financialYearStart = "April";
+
+    @Column(name = "budget_alerts", nullable = false)
+    @Builder.Default
+    private Boolean budgetAlerts = true;
+
+    @Column(name = "txn_reminders", nullable = false)
+    @Builder.Default
+    private Boolean txnReminders = true;
+
+    @Column(name = "monthly_summary", nullable = false)
+    @Builder.Default
+    private Boolean monthlySummary = true;
+
+    @Column(name = "large_txn_alert", nullable = false)
+    @Builder.Default
+    private Boolean largeTxnAlert = true;
+
+    @Column(name = "weekly_report", nullable = false)
+    @Builder.Default
+    private Boolean weeklyReport = false;
+
     @PrePersist
     public void onCreate() {
         createdAt = LocalDateTime.now();

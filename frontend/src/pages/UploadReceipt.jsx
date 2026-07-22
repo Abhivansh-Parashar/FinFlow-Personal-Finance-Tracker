@@ -318,7 +318,7 @@ export default function UploadReceipt() {
         type: 'EXPENSE',
         description: form.description,
         amount: Number(form.amount),
-      }, { monthlyBudget: user?.monthlyBudget })
+      }, { monthlyBudget: user?.monthlyBudget, user })
       setSaved({ merchant: form.description, amount: form.amount })
     } catch (err) {
       setError('Failed to save expense. Please try again.')

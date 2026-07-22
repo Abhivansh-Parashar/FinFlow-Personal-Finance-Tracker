@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Target, Plus, AlertTriangle, CheckCircle, X } from 'lucide-react'
 import { budgetService, categoryService, getApiList } from '../services/api'
 
@@ -213,7 +214,7 @@ export default function Budget() {
         )}
 
         {/* Modal */}
-        {showModal && (
+        {showModal && createPortal(
             <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
               <div className="modal">
                 <div className="modal-header">
@@ -248,7 +249,8 @@ export default function Budget() {
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
         )}
       </div>
   )

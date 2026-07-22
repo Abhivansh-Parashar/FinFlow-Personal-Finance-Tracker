@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { userService, getApiPayload } from '../services/api'
 import {
@@ -17,7 +17,6 @@ export default function Profile() {
   const [form, setForm] = useState({
     name:          user?.name          ?? '',
     email:         user?.email         ?? '',
-    phone:         user?.phone         ?? '',
     currency:      user?.currency      ?? '₹',
     monthlyBudget: user?.monthlyBudget ?? '',
   })
@@ -34,12 +33,48 @@ export default function Profile() {
   const fileInputRef = useRef(null)
 
   const [notifs, setNotifs] = useState([
-    { key: 'budgetAlerts',   label: 'Budget Alerts',          desc: "Get notified when you're close to your budget limit", enabled: true  },
-    { key: 'txnReminders',   label: 'Transaction Reminders',  desc: 'Reminders to log daily transactions',                 enabled: false },
-    { key: 'monthlySummary', label: 'Monthly Summary Email',  desc: 'Receive monthly financial summary via email',         enabled: true  },
-    { key: 'largeTxnAlert',  label: 'Large Transaction Alert',desc: 'Alert for transactions above ₹10,000',               enabled: true  },
-    { key: 'weeklyReport',   label: 'Weekly Report',          desc: 'Weekly spending insights every Monday',               enabled: false },
+    { key: 'budgetAlerts',   label: 'Budget Alerts',          desc: "Get notified when you're close to your budget limit", enabled: user?.budgetAlerts !== false  },
+    { key: 'txnReminders',   label: 'Transaction Reminders',  desc: 'Reminders to log daily transactions',                 enabled: user?.txnReminders !== false },
+    { key: 'monthlySummary', label: 'Monthly Summary Email',  desc: 'Receive monthly financial summary via email',         enabled: user?.monthlySummary !== false  },
+    { key: 'largeTxnAlert',  label: 'Large Transaction Alert',desc: 'Alert for transactions above ₹10,000',               enabled: user?.largeTxnAlert !== false  },
+    { key: 'weeklyReport',   label: 'Weekly Report',          desc: 'Weekly spending insights every Monday',               enabled: !!user?.weeklyReport },
   ])
+
+  // Preferences editing state
+  const [prefEditing, setPrefEditing] = useState(false)
+  const [prefSaving, setPrefSaving]   = useState(false)
+  const [prefForm, setPrefForm] = useState({
+    theme:              user?.theme              ?? 'Dark',
+    language:           user?.language           ?? 'English',
+    dateFormat:         user?.dateFormat         ?? 'DD/MM/YYYY',
+    financialYearStart: user?.financialYearStart ?? 'April',
+  })
+
+  // Synchronise form and settings when user context changes
+  useEffect(() => {
+    if (user) {
+      setForm({
+        name:          user.name          ?? '',
+        email:         user.email         ?? '',
+        currency:      user.currency      ?? '₹',
+        monthlyBudget: user.monthlyBudget ?? '',
+      })
+      setPrefForm({
+        theme:              user.theme              ?? 'Dark',
+        language:           user.language           ?? 'English',
+        dateFormat:         user.dateFormat         ?? 'DD/MM/YYYY',
+        financialYearStart: user.financialYearStart ?? 'April',
+      })
+      setNotifs([
+        { key: 'budgetAlerts',   label: 'Budget Alerts',          desc: "Get notified when you're close to your budget limit", enabled: user.budgetAlerts !== false  },
+        { key: 'txnReminders',   label: 'Transaction Reminders',  desc: 'Reminders to log daily transactions',                 enabled: user.txnReminders !== false },
+        { key: 'monthlySummary', label: 'Monthly Summary Email',  desc: 'Receive monthly financial summary via email',         enabled: user.monthlySummary !== false  },
+        { key: 'largeTxnAlert',  label: 'Large Transaction Alert',desc: 'Alert for transactions above ₹10,000',               enabled: user.largeTxnAlert !== false  },
+        { key: 'weeklyReport',   label: 'Weekly Report',          desc: 'Weekly spending insights every Monday',               enabled: !!user.weeklyReport },
+      ])
+      setPicPreview(user.profilePictureUrl ?? null)
+    }
+  }, [user])
 
   const initials = user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'
 
@@ -52,9 +87,17 @@ export default function Profile() {
         name:          form.name,
         currency:      form.currency,
         monthlyBudget: form.monthlyBudget ? Number(form.monthlyBudget) : undefined,
+        theme:              prefForm.theme,
+        language:           prefForm.language,
+        dateFormat:         prefForm.dateFormat,
+        financialYearStart: prefForm.financialYearStart,
       })
       const updated = getApiPayload(res)
-      setUser(updated ? { ...user, ...updated } : { ...user, ...form })
+      if (updated) {
+        setUser(updated)
+      } else {
+        setUser(prev => ({ ...prev, ...form }))
+      }
       setEditing(false)
       setSaveOk(true)
       setTimeout(() => setSaveOk(false), 3000)
@@ -62,6 +105,34 @@ export default function Profile() {
       setError('Failed to save changes.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // ── Save Preferences ──────────────────────────────────────────────
+  const handlePrefSave = async () => {
+    try {
+      setPrefSaving(true)
+      setError('')
+      const res = await userService.updateProfile({
+        name:          form.name,
+        currency:      form.currency,
+        monthlyBudget: form.monthlyBudget ? Number(form.monthlyBudget) : undefined,
+        theme:              prefForm.theme,
+        language:           prefForm.language,
+        dateFormat:         prefForm.dateFormat,
+        financialYearStart: prefForm.financialYearStart,
+      })
+      const updated = getApiPayload(res)
+      if (updated) {
+        setUser(updated)
+      }
+      setPrefEditing(false)
+      setSaveOk(true)
+      setTimeout(() => setSaveOk(false), 3000)
+    } catch {
+      setError('Failed to save preferences.')
+    } finally {
+      setPrefSaving(false)
     }
   }
 
@@ -116,7 +187,7 @@ export default function Profile() {
       const updated = getApiPayload(res)
       if (updated?.profilePictureUrl) {
         setPicPreview(updated.profilePictureUrl)
-        setUser({ ...user, profilePictureUrl: updated.profilePictureUrl })
+        setUser(updated)
       }
     } catch (err) {
       setPicError(err.response?.data?.message ?? 'Failed to upload image')
@@ -133,9 +204,12 @@ export default function Profile() {
     if (!window.confirm('Remove your profile picture?')) return
     try {
       setPicUploading(true)
-      await userService.deleteProfilePicture()
+      const res = await userService.deleteProfilePicture()
+      const updated = getApiPayload(res)
+      if (updated) {
+        setUser(updated)
+      }
       setPicPreview(null)
-      setUser({ ...user, profilePictureUrl: null })
     } catch {
       setPicError('Failed to remove profile picture')
     } finally {
@@ -143,8 +217,47 @@ export default function Profile() {
     }
   }
 
-  const toggleNotif = (key) => {
-    setNotifs(prev => prev.map(n => n.key === key ? { ...n, enabled: !n.enabled } : n))
+  const toggleNotif = async (key) => {
+    try {
+      setError('')
+      const targetNotif = notifs.find(n => n.key === key)
+      if (!targetNotif) return
+      const nextVal = !targetNotif.enabled
+
+      // Optimistic update
+      setNotifs(prev => prev.map(n => n.key === key ? { ...n, enabled: nextVal } : n))
+
+      const res = await userService.updateProfile({
+        name:          form.name,
+        currency:      form.currency,
+        monthlyBudget: form.monthlyBudget ? Number(form.monthlyBudget) : undefined,
+        theme:              prefForm.theme,
+        language:           prefForm.language,
+        dateFormat:         prefForm.dateFormat,
+        financialYearStart: prefForm.financialYearStart,
+        budgetAlerts:       key === 'budgetAlerts' ? nextVal : user?.budgetAlerts,
+        txnReminders:       key === 'txnReminders' ? nextVal : user?.txnReminders,
+        monthlySummary:     key === 'monthlySummary' ? nextVal : user?.monthlySummary,
+        largeTxnAlert:      key === 'largeTxnAlert' ? nextVal : user?.largeTxnAlert,
+        weeklyReport:       key === 'weeklyReport' ? nextVal : user?.weeklyReport,
+      })
+      const updated = getApiPayload(res)
+      if (updated) {
+        setUser(updated)
+      }
+    } catch {
+      setError('Failed to update notification settings.')
+      // Revert state from current user context
+      if (user) {
+        setNotifs([
+          { key: 'budgetAlerts',   label: 'Budget Alerts',          desc: "Get notified when you're close to your budget limit", enabled: user.budgetAlerts !== false  },
+          { key: 'txnReminders',   label: 'Transaction Reminders',  desc: 'Reminders to log daily transactions',                 enabled: user.txnReminders !== false },
+          { key: 'monthlySummary', label: 'Monthly Summary Email',  desc: 'Receive monthly financial summary via email',         enabled: user.monthlySummary !== false  },
+          { key: 'largeTxnAlert',  label: 'Large Transaction Alert',desc: 'Alert for transactions above ₹10,000',               enabled: user.largeTxnAlert !== false  },
+          { key: 'weeklyReport',   label: 'Weekly Report',          desc: 'Weekly spending insights every Monday',               enabled: !!user.weeklyReport },
+        ])
+      }
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────
@@ -341,7 +454,6 @@ export default function Profile() {
                     {[
                       { label: 'Full Name',          key: 'name',          type: 'text',   placeholder: 'Your full name'     },
                       { label: 'Email',              key: 'email',         type: 'email',  placeholder: 'your@email.com', disabled: true },
-                      { label: 'Phone',              key: 'phone',         type: 'tel',    placeholder: '+91 xxxxx xxxxx'   },
                       { label: 'Monthly Budget (₹)', key: 'monthlyBudget', type: 'number', placeholder: '50000'             },
                     ].map(field => (
                         <div key={field.key} className="form-group">
@@ -380,21 +492,100 @@ export default function Profile() {
             {/* Preferences */}
             {activeSection === 'preferences' && (
                 <div className="card fade-in">
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem', marginBottom: 24 }}>
-                    Preferences
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.1rem' }}>
+                      Preferences
+                    </div>
+                    {prefEditing ? (
+                        <button className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={handlePrefSave} disabled={prefSaving}>
+                          <Save size={14} /> {prefSaving ? 'Saving...' : 'Save Preferences'}
+                        </button>
+                    ) : (
+                        <button className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={() => setPrefEditing(true)}>
+                          <Edit2 size={14} /> Edit
+                        </button>
+                    )}
                   </div>
-                  {[
-                    { label: 'Default Currency',     value: `${form.currency} (${form.currency === '₹' ? 'INR' : form.currency === '$' ? 'USD' : 'Other'})` },
-                    { label: 'Date Format',          value: 'DD/MM/YYYY' },
-                    { label: 'Theme',                value: 'Dark'       },
-                    { label: 'Language',             value: 'English'    },
-                    { label: 'Financial Year Start', value: 'April'      },
-                  ].map(pref => (
-                      <div key={pref.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 0', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>{pref.label}</span>
-                        <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{pref.value}</span>
-                      </div>
-                  ))}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Default Currency</span>
+                      <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>
+                        {user?.currency === '₹' ? '₹ (INR)' : user?.currency === '$' ? '$ (USD)' : user?.currency === '€' ? '€ (EUR)' : '£ (GBP)'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Date Format</span>
+                      {prefEditing ? (
+                        <select
+                          className="form-input"
+                          style={{ width: '180px', padding: '6px 10px', fontSize: '0.875rem' }}
+                          value={prefForm.dateFormat}
+                          onChange={e => setPrefForm({ ...prefForm, dateFormat: e.target.value })}
+                        >
+                          <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                          <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                          <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                        </select>
+                      ) : (
+                        <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{user?.dateFormat || 'DD/MM/YYYY'}</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Theme</span>
+                      {prefEditing ? (
+                        <select
+                          className="form-input"
+                          style={{ width: '180px', padding: '6px 10px', fontSize: '0.875rem' }}
+                          value={prefForm.theme}
+                          onChange={e => setPrefForm({ ...prefForm, theme: e.target.value })}
+                        >
+                          <option value="Dark">Dark</option>
+                          <option value="Light">Light</option>
+                        </select>
+                      ) : (
+                        <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{user?.theme || 'Dark'}</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Language</span>
+                      {prefEditing ? (
+                        <select
+                          className="form-input"
+                          style={{ width: '180px', padding: '6px 10px', fontSize: '0.875rem' }}
+                          value={prefForm.language}
+                          onChange={e => setPrefForm({ ...prefForm, language: e.target.value })}
+                        >
+                          <option value="English">English</option>
+                          <option value="Spanish">Spanish</option>
+                          <option value="French">French</option>
+                          <option value="Hindi">Hindi</option>
+                        </select>
+                      ) : (
+                        <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{user?.language || 'English'}</span>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>Financial Year Start</span>
+                      {prefEditing ? (
+                        <select
+                          className="form-input"
+                          style={{ width: '180px', padding: '6px 10px', fontSize: '0.875rem' }}
+                          value={prefForm.financialYearStart}
+                          onChange={e => setPrefForm({ ...prefForm, financialYearStart: e.target.value })}
+                        >
+                          <option value="January">January</option>
+                          <option value="April">April</option>
+                        </select>
+                      ) : (
+                        <span style={{ fontWeight: 500, fontSize: '0.875rem' }}>{user?.financialYearStart || 'April'}</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
             )}
 
@@ -441,18 +632,9 @@ export default function Profile() {
                       <Shield size={14} /> {pwSaving ? 'Updating...' : 'Update Password'}
                     </button>
                   </div>
-
-                  <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--border)' }}>
-                    <div style={{ fontWeight: 600, marginBottom: 6 }}>Two-Factor Authentication</div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 12 }}>
-                      Add an extra layer of security to your account.
-                    </div>
-                    <button className="btn btn-secondary">
-                      <Shield size={14} /> Enable 2FA
-                    </button>
-                  </div>
                 </div>
             )}
+
 
             {/* Notifications */}
             {activeSection === 'notifications' && (

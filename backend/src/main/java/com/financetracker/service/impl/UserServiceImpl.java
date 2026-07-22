@@ -42,11 +42,8 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final FileStorageService fileStorageService;
 
-    @Override
-    @Transactional(readOnly = true)
-    public UserResponse getProfile() {
-        User user = getCurrentUser();
-
+    private UserResponse mapToUserResponse(User user) {
+        if (user == null) return null;
         return UserResponse.builder()
                 .id(user.getId())
                 .name(user.getName())
@@ -55,7 +52,24 @@ public class UserServiceImpl implements UserService {
                 .monthlyBudget(user.getMonthlyBudget())
                 .role(user.getRole())
                 .createdAt(user.getCreatedAt())
+                .profilePictureUrl(user.getProfilePictureUrl())
+                .theme(user.getTheme() != null ? user.getTheme() : "Dark")
+                .language(user.getLanguage() != null ? user.getLanguage() : "English")
+                .dateFormat(user.getDateFormat() != null ? user.getDateFormat() : "DD/MM/YYYY")
+                .financialYearStart(user.getFinancialYearStart() != null ? user.getFinancialYearStart() : "April")
+                .budgetAlerts(user.getBudgetAlerts() != null ? user.getBudgetAlerts() : true)
+                .txnReminders(user.getTxnReminders() != null ? user.getTxnReminders() : true)
+                .monthlySummary(user.getMonthlySummary() != null ? user.getMonthlySummary() : true)
+                .largeTxnAlert(user.getLargeTxnAlert() != null ? user.getLargeTxnAlert() : true)
+                .weeklyReport(user.getWeeklyReport() != null ? user.getWeeklyReport() : false)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserResponse getProfile() {
+        User user = getCurrentUser();
+        return mapToUserResponse(user);
     }
 
     @Override
@@ -66,17 +80,19 @@ public class UserServiceImpl implements UserService {
         user.setCurrency(request.getCurrency());
         user.setMonthlyBudget(request.getMonthlyBudget());
 
+        if (request.getTheme() != null) user.setTheme(request.getTheme());
+        if (request.getLanguage() != null) user.setLanguage(request.getLanguage());
+        if (request.getDateFormat() != null) user.setDateFormat(request.getDateFormat());
+        if (request.getFinancialYearStart() != null) user.setFinancialYearStart(request.getFinancialYearStart());
+        if (request.getBudgetAlerts() != null) user.setBudgetAlerts(request.getBudgetAlerts());
+        if (request.getTxnReminders() != null) user.setTxnReminders(request.getTxnReminders());
+        if (request.getMonthlySummary() != null) user.setMonthlySummary(request.getMonthlySummary());
+        if (request.getLargeTxnAlert() != null) user.setLargeTxnAlert(request.getLargeTxnAlert());
+        if (request.getWeeklyReport() != null) user.setWeeklyReport(request.getWeeklyReport());
+
         userRepository.save(user);
 
-        return UserResponse.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .currency(user.getCurrency())
-                .monthlyBudget(user.getMonthlyBudget())
-                .role(user.getRole())
-                .createdAt(user.getCreatedAt())
-                .build();
+        return mapToUserResponse(user);
     }
 
     @Override
@@ -117,15 +133,7 @@ public class UserServiceImpl implements UserService {
         user.setProfilePictureUrl(newProfilePictureUrl);
         userRepository.save(user);
 
-        return UserResponse.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .currency(user.getCurrency())
-                .monthlyBudget(user.getMonthlyBudget())
-                .role(user.getRole())
-                .profilePictureUrl(newProfilePictureUrl)
-                .build();
+        return mapToUserResponse(user);
     }
 
     @Override
@@ -136,14 +144,9 @@ public class UserServiceImpl implements UserService {
                 user.getProfilePictureUrl()
         );
         user.setProfilePictureUrl(null);
+        userRepository.save(user);
 
-        return UserResponse.builder()
-                .name(user.getName())
-                .email(user.getEmail())
-                .currency(user.getCurrency())
-                .monthlyBudget(user.getMonthlyBudget())
-                .role(user.getRole())
-                .profilePictureUrl(user.getProfilePictureUrl())
-                .build();
+        return mapToUserResponse(user);
     }
+
 }

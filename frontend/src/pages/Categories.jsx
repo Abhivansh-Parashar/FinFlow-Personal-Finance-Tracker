@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, X, Tag } from 'lucide-react'
 import { categoryService, getApiList } from '../services/api'
 
@@ -151,7 +152,7 @@ export default function Categories() {
             </div>
         )}
 
-        {showModal && (
+        {showModal && createPortal(
             <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
               <div className="modal">
                 <div className="modal-header">
@@ -223,7 +224,8 @@ export default function Categories() {
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
         )}
       </div>
   )

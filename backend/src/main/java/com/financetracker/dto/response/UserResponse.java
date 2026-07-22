@@ -19,4 +19,13 @@ public class UserResponse {
     private Role role;
     private LocalDateTime createdAt;
     private String profilePictureUrl;
+    private String theme;
+    private String language;
+    private String dateFormat;
+    private String financialYearStart;
+    private Boolean budgetAlerts;
+    private Boolean txnReminders;
+    private Boolean monthlySummary;
+    private Boolean largeTxnAlert;
+    private Boolean weeklyReport;
 }

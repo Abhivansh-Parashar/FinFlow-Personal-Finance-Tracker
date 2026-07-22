@@ -31,76 +31,81 @@ export default function Sidebar({ collapsed = false, onToggle }) {
   const initials = user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U'
 
   return (
-    <aside className="sidebar" style={{ width: collapsed ? 72 : 240 }}>
-      {/* Logo */}
-      <div className="sidebar-logo">
-        <div className="logo-icon">
-          <Wallet size={18} color="#000" strokeWidth={2.5} />
+    <div className="sidebar-wrapper" style={{ width: collapsed ? 72 : 240 }}>
+      <aside className="sidebar">
+        {/* Logo */}
+        <div className="sidebar-logo">
+          <div className="logo-icon">
+            <Wallet size={18} color="#000" strokeWidth={2.5} />
+          </div>
+          {!collapsed && <span className="logo-text">FinFlow</span>}
         </div>
-        {!collapsed && <span className="logo-text">FinFlow</span>}
-      </div>
+
+        {/* Nav */}
+        <nav className="sidebar-nav">
+          {NAV_ITEMS.map(({ to, icon: Icon, label, highlight }) => (
+            <NavLink
+              key={to}
+              to={to}
+              className={({ isActive }) => `nav-item ${isActive ? 'active' : ''} ${highlight ? 'nav-highlight' : ''}`}
+              title={collapsed ? label : undefined}
+            >
+              <Icon size={18} strokeWidth={1.8} />
+              {!collapsed && <span>{label}</span>}
+              {!collapsed && highlight && <span className="nav-ai-badge">AI</span>}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Bottom user */}
+        <div className="sidebar-footer">
+          {!collapsed ? (
+            <div className="user-info">
+              <div className="user-avatar">
+                {user?.profilePictureUrl ? (
+                  <img
+                    src={user.profilePictureUrl}
+                    alt={user?.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                  />
+                ) : (
+                  initials
+                )}
+              </div>
+              <div className="user-details">
+                <div className="user-name">{user?.name?.split(' ')[0]}</div>
+                <div className="user-email" title={user?.email}>{user?.email}</div>
+              </div>
+              <button className="logout-btn" onClick={handleLogout} title="Logout">
+                <LogOut size={15} />
+              </button>
+            </div>
+          ) : (
+            <button className="logout-btn collapsed" onClick={handleLogout} title="Logout">
+              <LogOut size={16} />
+            </button>
+          )}
+        </div>
+      </aside>
 
       {/* Collapse toggle */}
       <button className="collapse-btn" onClick={onToggle}>
         {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
       </button>
 
-      {/* Nav */}
-      <nav className="sidebar-nav">
-        {NAV_ITEMS.map(({ to, icon: Icon, label, highlight }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''} ${highlight ? 'nav-highlight' : ''}`}
-            title={collapsed ? label : undefined}
-          >
-            <Icon size={18} strokeWidth={1.8} />
-            {!collapsed && <span>{label}</span>}
-            {!collapsed && highlight && <span className="nav-ai-badge">AI</span>}
-          </NavLink>
-        ))}
-      </nav>
-
-      {/* Bottom user */}
-      <div className="sidebar-footer">
-        {!collapsed ? (
-          <div className="user-info">
-            <div className="user-avatar">
-              {user?.profilePictureUrl ? (
-                <img
-                  src={user.profilePictureUrl}
-                  alt={user?.name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
-                />
-              ) : (
-                initials
-              )}
-            </div>
-            <div className="user-details">
-              <div className="user-name">{user?.name?.split(' ')[0]}</div>
-              <div className="user-email" title={user?.email}>{user?.email}</div>
-            </div>
-            <button className="logout-btn" onClick={handleLogout} title="Logout">
-              <LogOut size={15} />
-            </button>
-          </div>
-        ) : (
-          <button className="logout-btn collapsed" onClick={handleLogout} title="Logout">
-            <LogOut size={16} />
-          </button>
-        )}
-      </div>
-
       <style>{`
-        .sidebar {
+        .sidebar-wrapper {
           position: fixed;
           top: 0; left: 0; bottom: 0;
+          z-index: 100;
+          transition: width 0.25s cubic-bezier(0.4,0,0.2,1);
+        }
+        .sidebar {
+          width: 100%; height: 100%;
           background: var(--bg-secondary);
           border-right: 1px solid var(--border);
           display: flex;
           flex-direction: column;
-          z-index: 100;
-          transition: width 0.25s cubic-bezier(0.4,0,0.2,1);
           overflow: hidden;
         }
         .sidebar-logo {
@@ -245,6 +250,6 @@ export default function Sidebar({ collapsed = false, onToggle }) {
         .logout-btn:hover { color: var(--accent-red); background: var(--accent-red-dim); }
         .logout-btn.collapsed { width: 100%; }
       `}</style>
-    </aside>
+    </div>
   )
 }

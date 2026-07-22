@@ -179,7 +179,14 @@ export const setNotificationSettings = (settings) => {
 }
 
 export const addTransactionNotification = (transaction, options = {}) => {
-  const settings = options.settings ?? getNotificationSettings()
+  const user = options.user
+  const settings = options.settings ?? (user ? {
+    budgetAlerts: user.budgetAlerts !== false,
+    txnReminders: user.txnReminders !== false,
+    monthlySummary: user.monthlySummary !== false,
+    largeTxnAlert: user.largeTxnAlert !== false,
+    weeklyReport: !!user.weeklyReport,
+  } : getNotificationSettings())
   const amount = Number(transaction?.amount ?? 0)
   const monthlyBudget = Number(options.monthlyBudget ?? 0)
   const notifications = []

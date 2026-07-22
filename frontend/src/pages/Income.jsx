@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { TrendingUp, ArrowUpRight, Plus, X, ArrowDownLeft } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { transactionService, reportService, categoryService, getApiList, normaliseTransaction, addTransactionNotification } from '../services/api'
@@ -60,7 +61,7 @@ export default function Income() {
         categoryName: incomeCategories.find(c => String(c.id) === String(form.categoryId))?.name,
         description: form.description,
         amount: Number(form.amount),
-      }, { monthlyBudget: user?.monthlyBudget })
+      }, { monthlyBudget: user?.monthlyBudget, user })
       await fetchData()
       setShowModal(false)
       setForm({ categoryId: '', amount: '', description: '', date: new Date().toISOString().split('T')[0], note: '' })
@@ -176,7 +177,7 @@ export default function Income() {
         </div>
 
         {/* Add Income Modal */}
-        {showModal && (
+        {showModal && createPortal(
             <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
               <div className="modal">
                 <div className="modal-header">
@@ -222,7 +223,8 @@ export default function Income() {
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
         )}
       </div>
   )

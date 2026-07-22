@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useOutletContext } from 'react-router-dom'
 import { Plus, Search, X, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 import TransactionRow from '../components/common/TransactionRow'
@@ -110,7 +111,7 @@ export default function Transactions() {
         await transactionService.update(editTarget.id, payload)
       } else {
         await transactionService.create(payload)
-        addTransactionNotification(payload, { monthlyBudget: user?.monthlyBudget })
+        addTransactionNotification(payload, { monthlyBudget: user?.monthlyBudget, user })
       }
       await fetchTransactions()
       setShowModal(false)
@@ -243,7 +244,7 @@ export default function Transactions() {
         </div>
 
         {/* Add / Edit Modal */}
-        {showModal && (
+        {showModal && createPortal(
             <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
               <div className="modal">
                 <div className="modal-header">
@@ -279,9 +280,21 @@ export default function Transactions() {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                     <div className="form-group">
                       <label className="form-label">Amount (₹)</label>
-                      <input className="form-input" type="number" placeholder="0"
-                             value={form.amount}
-                             onChange={e => setForm({ ...form, amount: e.target.value })} />
+                      <input
+                          className="form-input"
+                          type="number"
+                          min="0"
+                          placeholder="0"
+                          value={form.amount}
+                          onChange={e => {
+                            const value = e.target.value;
+
+                            setForm({
+                              ...form,
+                              amount: value === "" ? "" : Math.max(0, Number(value))
+                            });
+                          }}
+                      />
                     </div>
                     <div className="form-group">
                       <label className="form-label">Date</label>
@@ -316,7 +329,8 @@ export default function Transactions() {
                   </button>
                 </div>
               </div>
-            </div>
+            </div>,
+            document.body
         )}
 
         <style>{`

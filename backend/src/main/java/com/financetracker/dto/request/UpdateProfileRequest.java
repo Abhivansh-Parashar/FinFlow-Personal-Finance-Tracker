@@ -12,4 +12,14 @@ public class UpdateProfileRequest {
     private String currency;
     @Positive
     private BigDecimal monthlyBudget;
+
+    private String theme;
+    private String language;
+    private String dateFormat;
+    private String financialYearStart;
+    private Boolean budgetAlerts;
+    private Boolean txnReminders;
+    private Boolean monthlySummary;
+    private Boolean largeTxnAlert;
+    private Boolean weeklyReport;
 }

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { userService, getApiPayload } from '../services/api'
 
 // Auth context — minimal client-side auth state.
 // Loads token/user from localStorage (if present) and keeps them in sync.
@@ -16,6 +17,22 @@ export const AuthProvider = ({ children }) => {
   })
 
   const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('token'))
+
+  // Fetch the latest user profile from the database when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      userService.getProfile()
+        .then(res => {
+          const fetchedUser = getApiPayload(res)
+          if (fetchedUser) {
+            setUser(prev => prev ? { ...prev, ...fetchedUser } : fetchedUser)
+          }
+        })
+        .catch(err => {
+          console.error('Failed to fetch user profile on auth initialization:', err)
+        })
+    }
+  }, [isAuthenticated])
 
   // Listen for storage changes (from other tabs or API interceptor)
   useEffect(() => {
