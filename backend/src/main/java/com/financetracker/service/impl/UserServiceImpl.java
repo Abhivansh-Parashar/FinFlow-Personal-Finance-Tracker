@@ -78,7 +78,9 @@ public class UserServiceImpl implements UserService {
 
         user.setName(request.getName());
         user.setCurrency(request.getCurrency());
-        user.setMonthlyBudget(request.getMonthlyBudget());
+        // Only update monthlyBudget when provided, so partial updates
+        // (e.g. preference or notification toggles) don't wipe a saved budget.
+        if (request.getMonthlyBudget() != null) user.setMonthlyBudget(request.getMonthlyBudget());
 
         if (request.getTheme() != null) user.setTheme(request.getTheme());
         if (request.getLanguage() != null) user.setLanguage(request.getLanguage());

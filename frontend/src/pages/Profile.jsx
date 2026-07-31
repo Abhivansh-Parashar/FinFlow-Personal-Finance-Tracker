@@ -2,9 +2,18 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { userService, getApiPayload } from '../services/api'
 import {
-  User, Mail, Phone, Edit2, Save, Shield,
-  Bell, Palette, LogOut, CheckCircle, Camera, Trash2, X
+  User, Edit2, Save, Shield,
+  Bell, Palette, LogOut, CheckCircle, Camera, Trash2
 } from 'lucide-react'
+
+// Pure helper — kept at module scope so it isn't recreated every render
+const buildNotifs = (u) => [
+  { key: 'budgetAlerts',   label: 'Budget Alerts',          desc: "Get notified when you're close to your budget limit", enabled: u?.budgetAlerts !== false  },
+  { key: 'txnReminders',   label: 'Transaction Reminders',  desc: 'Reminders to log daily transactions',                 enabled: u?.txnReminders !== false },
+  { key: 'monthlySummary', label: 'Monthly Summary Email',  desc: 'Receive monthly financial summary via email',         enabled: u?.monthlySummary !== false  },
+  { key: 'largeTxnAlert',  label: 'Large Transaction Alert',desc: 'Alert for transactions above ₹10,000',               enabled: u?.largeTxnAlert !== false  },
+  { key: 'weeklyReport',   label: 'Weekly Report',          desc: 'Weekly spending insights every Monday',               enabled: !!u?.weeklyReport },
+]
 
 export default function Profile() {
   const { user, setUser, logout } = useAuth()
@@ -30,15 +39,10 @@ export default function Profile() {
   const [picUploading, setPicUploading] = useState(false)
   const [picError, setPicError]         = useState('')
   const [picPreview, setPicPreview]     = useState(user?.profilePictureUrl ?? null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const fileInputRef = useRef(null)
 
-  const [notifs, setNotifs] = useState([
-    { key: 'budgetAlerts',   label: 'Budget Alerts',          desc: "Get notified when you're close to your budget limit", enabled: user?.budgetAlerts !== false  },
-    { key: 'txnReminders',   label: 'Transaction Reminders',  desc: 'Reminders to log daily transactions',                 enabled: user?.txnReminders !== false },
-    { key: 'monthlySummary', label: 'Monthly Summary Email',  desc: 'Receive monthly financial summary via email',         enabled: user?.monthlySummary !== false  },
-    { key: 'largeTxnAlert',  label: 'Large Transaction Alert',desc: 'Alert for transactions above ₹10,000',               enabled: user?.largeTxnAlert !== false  },
-    { key: 'weeklyReport',   label: 'Weekly Report',          desc: 'Weekly spending insights every Monday',               enabled: !!user?.weeklyReport },
-  ])
+  const [notifs, setNotifs] = useState(buildNotifs(user))
 
   // Preferences editing state
   const [prefEditing, setPrefEditing] = useState(false)
@@ -65,13 +69,7 @@ export default function Profile() {
         dateFormat:         user.dateFormat         ?? 'DD/MM/YYYY',
         financialYearStart: user.financialYearStart ?? 'April',
       })
-      setNotifs([
-        { key: 'budgetAlerts',   label: 'Budget Alerts',          desc: "Get notified when you're close to your budget limit", enabled: user.budgetAlerts !== false  },
-        { key: 'txnReminders',   label: 'Transaction Reminders',  desc: 'Reminders to log daily transactions',                 enabled: user.txnReminders !== false },
-        { key: 'monthlySummary', label: 'Monthly Summary Email',  desc: 'Receive monthly financial summary via email',         enabled: user.monthlySummary !== false  },
-        { key: 'largeTxnAlert',  label: 'Large Transaction Alert',desc: 'Alert for transactions above ₹10,000',               enabled: user.largeTxnAlert !== false  },
-        { key: 'weeklyReport',   label: 'Weekly Report',          desc: 'Weekly spending insights every Monday',               enabled: !!user.weeklyReport },
-      ])
+      setNotifs(buildNotifs(user))
       setPicPreview(user.profilePictureUrl ?? null)
     }
   }, [user])
@@ -200,8 +198,13 @@ export default function Profile() {
   }
 
   // ── Profile picture — delete ──────────────────────────────────────
-  const handleDeletePicture = async () => {
-    if (!window.confirm('Remove your profile picture?')) return
+  // Uses an in-app confirmation (window.confirm is blocked in embedded/iframe contexts)
+  const handleDeletePicture = () => {
+    setConfirmDelete(true)
+  }
+
+  const doDeletePicture = async () => {
+    setConfirmDelete(false)
     try {
       setPicUploading(true)
       const res = await userService.deleteProfilePicture()
@@ -224,6 +227,17 @@ export default function Profile() {
       if (!targetNotif) return
       const nextVal = !targetNotif.enabled
 
+      // Build settings from local notifs state (not user context), so rapid
+      // toggles don't overwrite each other's server-side changes.
+      const nextSettings = {
+        budgetAlerts:   !!notifs.find(n => n.key === 'budgetAlerts')?.enabled,
+        txnReminders:   !!notifs.find(n => n.key === 'txnReminders')?.enabled,
+        monthlySummary: !!notifs.find(n => n.key === 'monthlySummary')?.enabled,
+        largeTxnAlert:  !!notifs.find(n => n.key === 'largeTxnAlert')?.enabled,
+        weeklyReport:   !!notifs.find(n => n.key === 'weeklyReport')?.enabled,
+      }
+      nextSettings[key] = nextVal
+
       // Optimistic update
       setNotifs(prev => prev.map(n => n.key === key ? { ...n, enabled: nextVal } : n))
 
@@ -235,11 +249,11 @@ export default function Profile() {
         language:           prefForm.language,
         dateFormat:         prefForm.dateFormat,
         financialYearStart: prefForm.financialYearStart,
-        budgetAlerts:       key === 'budgetAlerts' ? nextVal : user?.budgetAlerts,
-        txnReminders:       key === 'txnReminders' ? nextVal : user?.txnReminders,
-        monthlySummary:     key === 'monthlySummary' ? nextVal : user?.monthlySummary,
-        largeTxnAlert:      key === 'largeTxnAlert' ? nextVal : user?.largeTxnAlert,
-        weeklyReport:       key === 'weeklyReport' ? nextVal : user?.weeklyReport,
+        budgetAlerts:       nextSettings.budgetAlerts,
+        txnReminders:       nextSettings.txnReminders,
+        monthlySummary:     nextSettings.monthlySummary,
+        largeTxnAlert:      nextSettings.largeTxnAlert,
+        weeklyReport:       nextSettings.weeklyReport,
       })
       const updated = getApiPayload(res)
       if (updated) {
@@ -248,21 +262,13 @@ export default function Profile() {
     } catch {
       setError('Failed to update notification settings.')
       // Revert state from current user context
-      if (user) {
-        setNotifs([
-          { key: 'budgetAlerts',   label: 'Budget Alerts',          desc: "Get notified when you're close to your budget limit", enabled: user.budgetAlerts !== false  },
-          { key: 'txnReminders',   label: 'Transaction Reminders',  desc: 'Reminders to log daily transactions',                 enabled: user.txnReminders !== false },
-          { key: 'monthlySummary', label: 'Monthly Summary Email',  desc: 'Receive monthly financial summary via email',         enabled: user.monthlySummary !== false  },
-          { key: 'largeTxnAlert',  label: 'Large Transaction Alert',desc: 'Alert for transactions above ₹10,000',               enabled: user.largeTxnAlert !== false  },
-          { key: 'weeklyReport',   label: 'Weekly Report',          desc: 'Weekly spending insights every Monday',               enabled: !!user.weeklyReport },
-        ])
-      }
+      if (user) setNotifs(buildNotifs(user))
     }
   }
 
   // ── Render ────────────────────────────────────────────────────────
   return (
-      <div className="page">
+      <div className="page profile-page">
         <div className="page-header">
           <div>
             <div className="page-title">Profile</div>
@@ -321,6 +327,7 @@ export default function Profile() {
 
                 {/* Upload overlay button */}
                 <button
+                    type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={picUploading}
                     title="Change profile picture"
@@ -373,15 +380,30 @@ export default function Profile() {
 
               {/* Remove picture button — only show if picture exists */}
               {picPreview && (
-                  <div style={{ marginTop: 14 }}>
-                    <button
-                        onClick={handleDeletePicture}
-                        disabled={picUploading}
-                        className="btn btn-danger"
-                        style={{ padding: '5px 12px', fontSize: '0.75rem', gap: 5 }}
-                    >
-                      <Trash2 size={12} /> Remove photo
-                    </button>
+                  <div style={{ marginTop: 14, position: 'relative', zIndex: 2 }}>
+                    {confirmDelete ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>Remove your profile picture?</span>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button type="button" className="btn btn-danger" style={{ padding: '5px 12px', fontSize: '0.75rem', gap: 5, cursor: 'pointer' }} onClick={doDeletePicture} disabled={picUploading}>
+                              <Trash2 size={12} /> {picUploading ? 'Removing...' : 'Yes, remove'}
+                            </button>
+                            <button type="button" className="btn btn-secondary" style={{ padding: '5px 12px', fontSize: '0.75rem', gap: 5, cursor: 'pointer' }} onClick={() => setConfirmDelete(false)}>
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleDeletePicture}
+                            disabled={picUploading}
+                            className="btn btn-danger"
+                            style={{ padding: '5px 12px', fontSize: '0.75rem', gap: 5, position: 'relative', zIndex: 2, cursor: 'pointer' }}
+                        >
+                          <Trash2 size={12} /> Remove photo
+                        </button>
+                    )}
                   </div>
               )}
 
@@ -391,7 +413,7 @@ export default function Profile() {
             </div>
 
             {/* Section nav */}
-            <div className="card" style={{ padding: '8px' }}>
+            <div className="card" style={{ padding: '8px', position: 'relative', zIndex: 5 }}>
               {[
                 { id: 'personal',      icon: User,    label: 'Personal Info'  },
                 { id: 'preferences',   icon: Palette, label: 'Preferences'    },
@@ -399,12 +421,14 @@ export default function Profile() {
                 { id: 'notifications', icon: Bell,    label: 'Notifications'  },
               ].map(s => (
                   <button
+                      type="button"
                       key={s.id}
                       onClick={() => setActiveSection(s.id)}
                       className="btn"
                       style={{
                         width: '100%', justifyContent: 'flex-start',
                         padding: '10px 14px', gap: 10, marginBottom: 2,
+                        position: 'relative', zIndex: 6, cursor: 'pointer',
                         background: activeSection === s.id ? 'var(--accent-green-dim)' : 'transparent',
                         color:      activeSection === s.id ? 'var(--accent-green)'     : 'var(--text-secondary)',
                         fontWeight: activeSection === s.id ? 600 : 400,
@@ -417,8 +441,9 @@ export default function Profile() {
 
               <div style={{ borderTop: '1px solid var(--border)', marginTop: 8, paddingTop: 8 }}>
                 <button
+                    type="button"
                     className="btn btn-danger"
-                    style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 14px', gap: 10 }}
+                    style={{ width: '100%', justifyContent: 'flex-start', padding: '10px 14px', gap: 10, position: 'relative', zIndex: 2, cursor: 'pointer' }}
                     onClick={logout}
                 >
                   <LogOut size={15} /> Sign Out
@@ -439,11 +464,11 @@ export default function Profile() {
                     </div>
                     {editing
                         ? (
-                            <button className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={handleSave} disabled={saving}>
+                            <button type="button" className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '0.85rem', position: 'relative', zIndex: 2, cursor: 'pointer' }} onClick={handleSave} disabled={saving}>
                               <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
                             </button>
                         ) : (
-                            <button className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={() => setEditing(true)}>
+                            <button type="button" className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '0.85rem', position: 'relative', zIndex: 2, cursor: 'pointer' }} onClick={() => setEditing(true)}>
                               <Edit2 size={14} /> Edit
                             </button>
                         )
@@ -497,11 +522,11 @@ export default function Profile() {
                       Preferences
                     </div>
                     {prefEditing ? (
-                        <button className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={handlePrefSave} disabled={prefSaving}>
+                        <button type="button" className="btn btn-primary" style={{ padding: '8px 18px', fontSize: '0.85rem', position: 'relative', zIndex: 2, cursor: 'pointer' }} onClick={handlePrefSave} disabled={prefSaving}>
                           <Save size={14} /> {prefSaving ? 'Saving...' : 'Save Preferences'}
                         </button>
                     ) : (
-                        <button className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '0.85rem' }} onClick={() => setPrefEditing(true)}>
+                        <button type="button" className="btn btn-secondary" style={{ padding: '8px 18px', fontSize: '0.85rem', position: 'relative', zIndex: 2, cursor: 'pointer' }} onClick={() => setPrefEditing(true)}>
                           <Edit2 size={14} /> Edit
                         </button>
                     )}
@@ -624,8 +649,9 @@ export default function Profile() {
                              value={pwForm.confirm} onChange={e => setPwForm({ ...pwForm, confirm: e.target.value })} />
                     </div>
                     <button
+                        type="button"
                         className="btn btn-primary"
-                        style={{ width: 'fit-content' }}
+                        style={{ width: 'fit-content', position: 'relative', zIndex: 2, cursor: 'pointer' }}
                         onClick={handlePasswordChange}
                         disabled={pwSaving}
                     >
@@ -672,6 +698,28 @@ export default function Profile() {
 
           </div>
         </div>
+
+        {/* Neutralize the global 3D effects on this page entirely.
+            The 3D animations (`.page { perspective }`, `.page > * { pageFlipIn }
+            with forwards fill, `.card:hover { translateZ(20px) }`, preserve-3d)
+            keep a persistent 3D rendering context alive on this page, which
+            breaks hit-testing in Chrome — clicks on the nav card below the
+            avatar card never reach the buttons. Flat layout fixes it. */}
+        <style>{`
+          .profile-page {
+            perspective: none !important;
+          }
+          .profile-page > * {
+            animation: none !important;
+          }
+          .profile-page .card,
+          .profile-page .card:hover {
+            transform: none !important;
+          }
+          .profile-page .card {
+            transform-style: flat !important;
+          }
+        `}</style>
       </div>
   )
 }
