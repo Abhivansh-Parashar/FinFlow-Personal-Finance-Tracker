@@ -1,0 +1,40 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: finflow-mysql
+    environment:
+      MYSQL_DATABASE: finflow
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+  backend:
+    image: finflow-backend:latest
+    container_name: finflow-backend
+    environment:
+      DB_HOST: mysql
+      DB_NAME: finflow
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+
+  frontend:
+    image: finflow-frontend:latest
+    container_name: finflow-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql-data:
