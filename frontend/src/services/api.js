@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -264,7 +264,7 @@ export const authService = {
   login:    (data) => api.post('/auth/login', data),
 }
 
-export const getGoogleAuthUrl = () => "http://localhost:8080/oauth2/authorization/google";
+export const getGoogleAuthUrl = () => "/oauth2/authorization/google";
 
 // ── Transaction Service ──────────────────────────────────────────────────────
 export const transactionService = {

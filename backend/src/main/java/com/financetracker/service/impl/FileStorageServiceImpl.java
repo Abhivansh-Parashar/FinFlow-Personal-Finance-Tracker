@@ -65,9 +65,6 @@ public class FileStorageServiceImpl implements FileStorageService {
     private String uploadDir;
     @Value("${app.file.max-size-mb:5}")
     private long maxSizeMb;
-    @Value("${server.port:8080}")
-    private String serverPort;
-
     private static final List<String> ALLOWED_TYPES = List.of(
             "image/jpeg",
             "image/jpg",
@@ -127,8 +124,7 @@ public class FileStorageServiceImpl implements FileStorageService {
 
         Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
 
-        return "http://localhost:" + serverPort
-                + "/uploads/avatars/"
+        return "/uploads/avatars/"
                 + fileName;
     }
 

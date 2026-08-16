@@ -8,10 +8,17 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
     volumes:
       - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   backend:
     image: finflow-backend:latest
     container_name: finflow-backend
+    volumes:
+      - uploads-data:/app/uploads
     environment:
       DB_HOST: mysql
       DB_NAME: finflow
@@ -26,7 +33,8 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
   frontend:
     image: finflow-frontend:latest
@@ -38,3 +46,4 @@ services:
 
 volumes:
   mysql-data:
+  uploads-data:
