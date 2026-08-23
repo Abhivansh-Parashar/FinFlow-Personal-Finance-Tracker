@@ -84,20 +84,23 @@ public class TransactionServiceImpl implements TransactionService {
     @Transactional(readOnly = true)
     public Page<TransactionResponse> getAllTransactions(TransactionType type, String month, Long categoryId, Pageable pageable) {
         User user = getCurrentUser();
-        Page<Transaction> transactions;
+        LocalDateTime startDate = null;
+        LocalDateTime endDate = null;
 
-        if (categoryId != null) {
-            transactions = transactionRepository.findAllByUserIdAndCategoryId(user.getId(), categoryId, pageable);
-        } else if (month != null && !month.isBlank()) {
+        if (month != null && !month.isBlank()) {
             YearMonth yearMonth = YearMonth.parse(month);
-            LocalDateTime startDate = yearMonth.atDay(1).atStartOfDay();
-            LocalDateTime endDate = yearMonth.atEndOfMonth().atTime(23, 59, 59);
-            transactions = transactionRepository.findAllByUserIdAndDateBetween(user.getId(), startDate, endDate, pageable);
-        } else if (type != null) {
-            transactions = transactionRepository.findAllByUserIdAndTransactionType(user.getId(), type, pageable);
-        } else {
-            transactions = transactionRepository.findAllByUserId(user.getId(), pageable);
+            startDate = yearMonth.atDay(1).atStartOfDay();
+            endDate = yearMonth.atEndOfMonth().atTime(23, 59, 59);
         }
+
+        Page<Transaction> transactions = transactionRepository.findAllFiltered(
+                user.getId(),
+                type,
+                startDate,
+                endDate,
+                categoryId,
+                pageable
+        );
 
         return transactions.map(this::buildResponse);
     }

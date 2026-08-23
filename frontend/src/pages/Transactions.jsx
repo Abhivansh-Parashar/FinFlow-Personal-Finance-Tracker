@@ -43,6 +43,7 @@ export default function Transactions() {
         page,
         sort: 'date,desc',
         ...(filter.type !== 'ALL' && { type: filter.type }),
+        ...(filter.month && { month: filter.month }),
       }
       const res = await transactionService.getAll(params)
       let list = getApiList(res).map(normaliseTransaction)
@@ -54,10 +55,6 @@ export default function Transactions() {
           t.description?.toLowerCase().includes(searchQ) ||
           (t.categoryName || '').toLowerCase().includes(searchQ)
         )
-      }
-      // Client-side month filter
-      if (filter.month) {
-        list = list.filter(t => String(t.date || '').startsWith(filter.month))
       }
 
       setTransactions(list)
